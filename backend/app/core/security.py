@@ -41,7 +41,7 @@ async def get_current_user_opt(
         return None
     try:
         payload = decode_token(creds.credentials, settings.JWT_SECRET, settings.JWT_ALG)
-        return {"user_id": payload.get("sub"), "email": payload.get("email")}
+        return {"user_id": payload.get("sub"), "login": payload.get("login")}
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
