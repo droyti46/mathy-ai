@@ -35,8 +35,7 @@ def _attempt_to_dict(a: m.Attempt) -> Dict[str, Any]:
 def _user_to_dict(u: m.User) -> Dict[str, Any]:
     return {
         "id": u.id,
-        "email": u.email,
-        "name": u.name,
+        "login": u.login,
         "password_hash": u.password_hash,
         "created_at": _to_iso_utc(u.created_at),
     }
@@ -137,7 +136,7 @@ class SqlUserRepo:
         row = res.scalar_one_or_none()
         return _user_to_dict(row) if row else None
 
-    async def get_by_email(self, email: str) -> Optional[dict]:
-        res = await self.session.execute(select(m.User).where(m.User.email == email))
+    async def get_by_login(self, login: str) -> Optional[dict]:
+        res = await self.session.execute(select(m.User).where(m.User.login == login))
         row = res.scalar_one_or_none()
         return _user_to_dict(row) if row else None
