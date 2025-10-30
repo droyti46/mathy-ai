@@ -6,11 +6,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.settings import Settings
+from app.settings import Settings, get_settings
 
 # локальный провайдер, чтобы не тянуть deps и не создавать цикл
 def _get_settings() -> Settings:
-    return Settings()
+    return get_settings()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 auth_scheme = HTTPBearer(auto_error=False)
