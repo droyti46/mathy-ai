@@ -1,12 +1,11 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from functools import lru_cache
 from pathlib import Path
 
-OPENROUTER_API_KEY: str = "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"
-OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-OCR_MODEL: str = 'openai/gpt-4o-mini'
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     APP_NAME: str = "math-trainer"
     DATA_PATH: str = "data/tasks.csv"
@@ -34,7 +33,12 @@ class Settings(BaseSettings):
     # Teacher mode
     TEACHER_MODE: bool = True
 
-    def ensure_dirs(self):
+    def ensure_dirs(self) -> "Settings":
         Path(self.STORAGE_DIR).mkdir(parents=True, exist_ok=True)
         Path("./var").mkdir(parents=True, exist_ok=True)
         return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings().ensure_dirs()
