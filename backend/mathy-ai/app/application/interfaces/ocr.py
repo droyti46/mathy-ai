@@ -1,3 +1,0 @@
-from typing import Protocol
-class IOCRService(Protocol):
-    async def image_to_text(self, path: str) -> str: ...
