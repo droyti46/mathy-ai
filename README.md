@@ -3,6 +3,7 @@
 
 <div align="center">
   <img src="img/logo.png" width=500px>
+  <img src="img/main-screen.png" width=500px>
 </div>
 
 ## Инструкция по запуску
