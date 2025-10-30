@@ -15,6 +15,7 @@ def gen_id() -> str:
 class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=gen_id)            # ← добавили default
+    name: Mapped[str] = mapped_column(String, default="", server_default="")
     login: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)  # ← DateTime

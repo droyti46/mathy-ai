@@ -16,9 +16,15 @@ async def register(payload: RegisterIn, uow=Depends(get_uow)):
     if existing:
         raise HTTPException(status_code=400, detail="Login already registered")
     user_id = str(uuid.uuid4())
-    user = {"id": user_id, "login": payload.login, "password_hash": hash_password(payload.password)}
+    name = payload.name or payload.login
+    user = {
+        "id": user_id,
+        "name": name,
+        "login": payload.login,
+        "password_hash": hash_password(payload.password),
+    }
     await uow.users.add(user)
-    return UserOut(id=user_id, login=payload.login)
+    return UserOut(id=user_id, login=payload.login, name=name)
 
 
 @router.post("/login", response_model=TokenPair)
@@ -49,7 +55,7 @@ async def me(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     db = await uow.users.get(user["user_id"])
-    return UserOut(id=db["id"], login=db["login"])
+    return UserOut(id=db["id"], login=db["login"], name=db.get("name") or db["login"])
 
 
 @router.get("/me/stats", response_model=StatsOut)

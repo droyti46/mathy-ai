@@ -8,7 +8,7 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy import text
 
 
-async def _ensure_login_column(conn: AsyncConnection) -> None:
+async def _ensure_user_columns(conn: AsyncConnection) -> None:
     columns_result = await conn.execute(text("PRAGMA table_info(users)"))
     column_names = {row[1] for row in columns_result}
 
@@ -17,6 +17,9 @@ async def _ensure_login_column(conn: AsyncConnection) -> None:
             await conn.execute(text("ALTER TABLE users RENAME COLUMN email TO login"))
         else:
             await conn.execute(text("ALTER TABLE users ADD COLUMN login TEXT"))
+
+    if "name" not in column_names:
+        await conn.execute(text("ALTER TABLE users ADD COLUMN name TEXT DEFAULT '' NOT NULL"))
 
     indexes_result = await conn.execute(text("PRAGMA index_list(users)"))
     index_names = {row[1] for row in indexes_result}
@@ -37,4 +40,4 @@ def create_engine_and_session(database_url: str):
 async def init_models(engine: AsyncEngine):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await _ensure_login_column(conn)
+        await _ensure_user_columns(conn)
