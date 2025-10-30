@@ -1,0 +1,204 @@
+# ============================================
+# 🌐 GLOBAL SETTINGS
+# ============================================
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+
+# Logs
+*.log
+logs/
+*.out
+*.err
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.pytest_cache/
+.cache/
+test-results/
+
+# MyPy / Pyre / Type Checker
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# PyInstaller
+*.spec
+build/
+dist/
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# SQLite and other DBs
+*.sqlite3
+*.db
+*.sqlite
+
+# Backup and temp files
+*.bak
+*.swp
+*~
+*.tmp
+*.temp
+*.orig
+
+# ============================================
+# 🐍 PYTHON / FASTAPI BACKEND
+# ============================================
+
+# Python virtual environment
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env
+backend/__pycache__/
+backend/*.pyc
+
+# FastAPI build artifacts
+backend/build/
+backend/dist/
+
+# Pydantic / generated files
+backend/.mypy_cache/
+backend/.pytest_cache/
+backend/.coverage
+backend/.ruff_cache/
+
+# Database / Alembic migrations cache
+backend/alembic/versions/__pycache__/
+backend/alembic/*.log
+
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# Docker / Compose
+*.pid
+*.pid.lock
+*.seed
+*.tar
+*.log
+docker-compose.override.yml
+.env.docker
+
+# ============================================
+# ⚛️ REACT FRONTEND
+# ============================================
+
+# dependencies
+frontend/node_modules/
+frontend/.pnp/
+frontend/.pnp.js
+
+# testing
+frontend/coverage/
+frontend/jest-html-reporters-*
+frontend/.eslintcache
+
+# production
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+
+# misc
+frontend/.DS_Store
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# log files
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# editor
+frontend/.idea/
+frontend/.vscode/
+
+# ============================================
+# 🔧 PROJECT TOOLS / DOCKER / CI
+# ============================================
+
+# Docker
+docker-compose.override.yml
+*.pid
+*.pid.lock
+.docker/
+.dockerignore
+Dockerfile.*
+
+# VSCode / PyCharm / JetBrains
+.vscode/
+.idea/
+*.iml
+
+# Poetry / Pipenv
+poetry.lock
+Pipfile.lock
+
+# ============================================
+# 📦 EXTRA: CACHE & BUILD SYSTEMS
+# ============================================
+
+# Cache
+.cache/
+.npm/
+.yarn/
+.yarn-cache/
+.pnpm-store/
+.parcel-cache/
+__pycache__/
+
+# Compiled binary artifacts
+*.so
+*.dll
+*.dylib
+*.exe
+*.bin
+
+# Local dev tools
+.envrc
+.direnv
+.local/
+*.local
