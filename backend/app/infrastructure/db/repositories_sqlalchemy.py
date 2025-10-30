@@ -35,6 +35,7 @@ def _attempt_to_dict(a: m.Attempt) -> Dict[str, Any]:
 def _user_to_dict(u: m.User) -> Dict[str, Any]:
     return {
         "id": u.id,
+        "name": u.name,
         "login": u.login,
         "password_hash": u.password_hash,
         "created_at": _to_iso_utc(u.created_at),

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class RegisterIn(BaseModel):
     login: str
     password: str
+    name: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -20,6 +21,7 @@ class TokenPair(BaseModel):
 class UserOut(BaseModel):
     id: str
     login: str
+    name: str | None = None
 
 
 class StatsOut(BaseModel):
