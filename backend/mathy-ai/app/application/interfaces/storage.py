@@ -1,3 +1,0 @@
-from typing import Protocol
-class IStorage(Protocol):
-    async def save(self, file_bytes: bytes, ext: str) -> str: ...
