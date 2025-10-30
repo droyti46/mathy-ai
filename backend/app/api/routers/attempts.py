@@ -4,6 +4,7 @@ from app.api.schemas.attempt import AttemptIn, AttemptOut, Feedback, Span
 from app.core.deps import get_uow, get_llm, get_ocr
 from datetime import datetime, timezone
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
+from app.application.markers import postprocess_marked_text
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -55,17 +56,24 @@ async def create_attempt(
     result = await llm.grade(task.statement_md, payload.text, reference=task.reference_solution_md)
 
     fb = _build_feedback(result)
+    score = result.get("score") if isinstance(result, dict) else None
 
     marked = await llm.mark_errors(task.statement_md, payload.text)
+    stitched_solution, marker_spans = postprocess_marked_text(payload.text, marked)
+
+    if not fb.spans and marker_spans:
+        fb.spans = marker_spans
+    if not fb.spans_detail and marker_spans:
+        fb.spans_detail = [Span(start=s, end=e) for s, e in marker_spans]
 
     now = _now_iso()
 
     attempt_id = await uow.attempts.save({
         "task_id": payload.task_id,
         "mode": payload.mode,
-        "solution_text": marked,   # ← сохраняем размеченный текст
-        "feedback": {"summary": "", "spans": [], "spans_detail": []},  # временно пусто
-        "score": None,
+        "solution_text": stitched_solution,   # ← сохраняем размеченный текст
+        "feedback": fb.model_dump(),
+        "score": score,
         "time_spent_sec": payload.time_spent_sec,
         "created_at": now,
     })
@@ -73,9 +81,9 @@ async def create_attempt(
     return AttemptOut(
         id=str(attempt_id),
         task_id=payload.task_id,
-        solution_text=marked,
-        feedback=Feedback(summary="", spans=[], spans_detail=[]),
-        score=None,
+        solution_text=stitched_solution,
+        feedback=fb,
+        score=score,
         created_at=now,
     )
 
@@ -95,14 +103,17 @@ async def create_attempt_file(
     # 2) OCR → text
     text = await ocr.extract_text(file)
     marked = await llm.mark_errors(task.statement_md, text)
+    stitched_solution, marker_spans = postprocess_marked_text(text, marked)
+
+    feedback = Feedback(summary="", spans=marker_spans, spans_detail=[Span(start=s, end=e) for s, e in marker_spans])
 
     now = _now_iso()
 
     attempt_id = await uow.attempts.save({
         "task_id": task_id,
         "mode": "solve",
-        "solution_text": marked,
-        "feedback": {"summary": "", "spans": [], "spans_detail": []},
+        "solution_text": stitched_solution,
+        "feedback": feedback.model_dump(),
         "score": None,
         "created_at": now,
     })
@@ -110,8 +121,8 @@ async def create_attempt_file(
     return AttemptOut(
         id=str(attempt_id),
         task_id=task_id,
-        solution_text=marked,
-        feedback=Feedback(summary="", spans=[], spans_detail=[]),
+        solution_text=stitched_solution,
+        feedback=feedback,
         score=None,
         created_at=now,
     )
