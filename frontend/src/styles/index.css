@@ -1,0 +1,28 @@
+@import './fonts.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Глобальные токены под макет */
+:root{
+  --color-white:#ffffff;
+  --color-primary-200:#BBDEFB;
+  --color-primary-500:#42A5F5;
+  --color-primary-900:#1565C0;
+}
+html, body, #root { height: 100%; }
+body { @apply font-sans text-neutral-900; }
+
+@keyframes maty-cloud-move {
+  0%   { transform: translateX(-25vw) scale(var(--s)); }
+  100% { transform: translateX(105vw) scale(var(--s)); }
+}
+
+.maty-cloud {
+  position: absolute;
+  animation: maty-cloud-move var(--dur) linear forwards;
+  top: var(--top);
+  opacity: .95;
+  will-change: transform;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,.08));
+}
