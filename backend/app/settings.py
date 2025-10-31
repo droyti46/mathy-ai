@@ -5,10 +5,22 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+BASE_DIR = Path(__file__).resolve().parents[2]
 
-    APP_NAME: str = Field(...)
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(
+            BASE_DIR / ".env",
+            BASE_DIR / "backend" / ".env",
+            Path(__file__).resolve().parent / ".env",
+            Path(".env"),
+        ),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    APP_NAME: str = Field("math-trainer")
     DATA_PATH: str = Field(...)
     STORAGE_DIR: str = Field(...)
 
@@ -22,7 +34,7 @@ class Settings(BaseSettings):
     LLM_MODEL_HINT: str = Field(...)
     LLM_MODEL_SOLVE: str = Field(...)
     LLM_MODEL_VISION: str = Field(...)
-    OCR_MODEL: str = Field(...)
+    OCR_MODEL: str = Field("openai/gpt-4o-mini")
     STRICT_JSON: bool = Field(...)
 
     # Auth/JWT
