@@ -31,7 +31,6 @@ export default function WelcomePage() {
       {/* HERO */}
       <header className="relative h-screen bg-primary-500 text-white overflow-hidden flex flex-col">
         <img src={sun} alt="" className="pointer-events-none select-none absolute right-0 top-0 w-48 md:w-64" />
-        <CloudField sprites={[cloud1, cloud2, cloud3]} density={5} />
         
         <div className="container max-w-6xl mx-auto px-6 py-10 flex justify-between items-center">
           <Link to="/"><img src={logoMathy} alt="Мати" className="h-7" /></Link>
@@ -41,7 +40,7 @@ export default function WelcomePage() {
           </nav>
         </div>
         
-        <div className="container mx-auto px-6 text-center flex-grow flex flex-col justify-center">
+        <div className="container mx-auto px-6 text-center flex-grow flex flex-col justify-center z-10">
           <h1 className="text-4xl md:text-6xl font-extrabold">Математический</h1>
           <h1 className="text-4xl md:text-6xl font-extrabold">тренажёр</h1>
           <p className="mt-6 opacity-90">Решение математических задач с автоматической проверкой от ИИ</p>
@@ -51,15 +50,17 @@ export default function WelcomePage() {
         </div>
       </header>
 
+      <CloudField sprites={[cloud1, cloud2, cloud3]} density={5} />
+
       {/* ICONS GRID */}
       <section className="container mx-auto max-w-6xl px-6 py-16">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-center">
           {[icon1,icon2,icon3,icon4,icon5,icon6,icon7,icon8,icon9,icon10].map((src, i) => (
             <div key={i} className="flex flex-col items-center">
-              <img src={src} alt="" className="w-12 h-12 object-contain mb-2" />
-              <div className="text-sm opacity-80">
+              <img src={src} alt="" className="w-[60px] h-[60px] object-contain mb-2" />
+              <div className="text-base">
                 {[
-                  'мат. анализ','линал и геометрия','теор. вер. и статистика','дискретная математика','диффуры',
+                  'Мат. анализ','Линал и геометрия','теор. вер. и статистика','дискретная математика','диффуры',
                   'численные методы','оптимизация','теория чисел','функц. анализ','прикладная математика'
                 ][i]}
               </div>
@@ -123,7 +124,7 @@ export default function WelcomePage() {
           <Button onClick={() => navigate('/auth?tab=register')}>Зарегистрироваться</Button>
           <button
             onClick={() => navigate('/auth?tab=login')}
-            className="rounded-xl2 px-6 py-3 font-semibold shadow-card border-2 border-primary-500 text-primary-900 bg-white hover:bg-primary-200 transition"
+            className="rounded-xl2 px-6 py-3 font-semibold border-2 border-primary-500 text-primary-900 bg-white hover:bg-primary-200 transition"
           >
             Войти
           </button>

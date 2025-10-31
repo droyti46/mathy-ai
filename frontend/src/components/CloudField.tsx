@@ -26,7 +26,7 @@ export default function CloudField({ sprites, density = 4 }: { sprites: Sprite[]
   }, []);
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden -z-0">
       {clouds.map((c) => (
         <img
           key={c.id}
