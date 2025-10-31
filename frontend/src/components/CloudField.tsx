@@ -16,7 +16,7 @@ export default function CloudField({ sprites, density = 4 }: { sprites: Sprite[]
     sprite: sprites[Math.floor(Math.random() * sprites.length)],
     top: `${rand(8, 70)}%`,
     s: rand(0.8, 1.25),
-    dur: rand(22, 38) // секунды
+    dur: rand(10, 38) // секунды
   });
 
   // начальная партия

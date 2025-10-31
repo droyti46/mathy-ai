@@ -22,7 +22,6 @@ body { @apply font-sans text-neutral-900; }
   position: absolute;
   animation: maty-cloud-move var(--dur) linear forwards;
   top: var(--top);
-  opacity: .95;
+  opacity: .8;
   will-change: transform;
-  filter: drop-shadow(0 3px 10px rgba(0,0,0,.08));
 }

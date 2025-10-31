@@ -1,10 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
 import CloudField from '@/components/CloudField';
+import logoMathy from '@/assets/images/logo-mathy.png';
 import sun from '@/assets/images/sun-top-right.png';
 import cloud1 from '@/assets/images/cloud-1.png';
 import cloud2 from '@/assets/images/cloud-2.png';
 import cloud3 from '@/assets/images/cloud-3.png';
 import mascotHead from '@/assets/images/mascot-head.png';
+import mascotFace from '@/assets/images/mascot-face.png';
 import shapesRow from '@/assets/images/shapes-row.png';
 import logoSber from '@/assets/images/logo-sber.png';
 import logoCU from '@/assets/images/logo-central-university.png';
@@ -25,20 +27,23 @@ export default function WelcomePage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen">
+    <div className="h-screen">
       {/* HERO */}
-      <header className="relative bg-primary-500 text-white overflow-hidden">
+      <header className="relative h-screen bg-primary-500 text-white overflow-hidden flex flex-col">
         <img src={sun} alt="" className="pointer-events-none select-none absolute right-0 top-0 w-48 md:w-64" />
-        <CloudField sprites={[cloud1, cloud2, cloud3]} density={4} />
-        <div className="container mx-auto px-6 py-6 flex justify-between items-center">
-          <div className="text-2xl font-semibold">Мати</div>
+        <CloudField sprites={[cloud1, cloud2, cloud3]} density={5} />
+        
+        <div className="container max-w-6xl mx-auto px-6 py-10 flex justify-between items-center">
+          <Link to="/"><img src={logoMathy} alt="Мати" className="h-7" /></Link>
           <nav className="space-x-8 text-lg">
-            <Link to="/auth?tab=register" className="opacity-90 hover:opacity-100">Регистрация</Link>
-            <Link to="/auth?tab=login" className="opacity-90 hover:opacity-100">Вход</Link>
+            <Link to="/auth?tab=register" className="opacity-90 hover:text-primary-900 transition-colors duration-300 relative after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-0.5 after:w-0 after:bg-primary-900 after:transition-all after:duration-300 hover:after:w-full">Регистрация</Link>
+            <Link to="/auth?tab=login" className="opacity-90 hover:text-primary-900 transition-colors duration-300 relative after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-0.5 after:w-0 after:bg-primary-900 after:transition-all after:duration-300 hover:after:w-full">Вход</Link>
           </nav>
         </div>
-        <div className="container mx-auto px-6 py-16 md:py-24 text-center">
-          <h1 className="text-4xl md:text-6xl font-extrabold">Математический тренажёр</h1>
+        
+        <div className="container mx-auto px-6 text-center flex-grow flex flex-col justify-center">
+          <h1 className="text-4xl md:text-6xl font-extrabold">Математический</h1>
+          <h1 className="text-4xl md:text-6xl font-extrabold">тренажёр</h1>
           <p className="mt-6 opacity-90">Решение математических задач с автоматической проверкой от ИИ</p>
           <div className="mt-8">
             <Button onClick={() => navigate('/auth?tab=register')}>Попробовать</Button>
@@ -47,7 +52,7 @@ export default function WelcomePage() {
       </header>
 
       {/* ICONS GRID */}
-      <section className="container mx-auto px-6 py-10">
+      <section className="container mx-auto max-w-6xl px-6 py-16">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-center">
           {[icon1,icon2,icon3,icon4,icon5,icon6,icon7,icon8,icon9,icon10].map((src, i) => (
             <div key={i} className="flex flex-col items-center">
@@ -63,44 +68,57 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      {/* BANK + DEMO */}
-      <section className="container mx-auto px-6 py-10 grid md:grid-cols-2 gap-8 items-center">
-        <div>
-          <h2 className="text-3xl font-bold">Большой банк заданий</h2>
-          <p className="mt-3 text-lg">
-            <span className="text-primary-900 font-semibold">1000+ задач</span> на 10 тем и 3 уровня сложности.  
-            Каждый найдёт что-то для себя!
-          </p>
-          <div className="mt-8 flex items-center gap-6">
-            <img src={mascotHead} alt="" className="w-44 h-44 object-contain" />
-            <div className="text-2xl font-bold">2 + 2 = <span className="bg-primary-200 px-2 rounded-md">5</span></div>
+{/* BANK + DEMO */}
+      <section className="container mx-auto max-w-6xl px-6 py-16 space-y-16">
+        {/* Первая фича */}
+        <div className="grid md:grid-cols-2 gap-8 items-center">
+          <div>
+            <h2 className="text-3xl font-bold">Большой банк заданий</h2>
+            <p className="mt-3 text-lg">
+              <span className="text-primary-900 font-semibold">1000+ задач</span> на 10 тем и 3 уровня сложности.  
+              Каждый найдёт что-то для себя!
+            </p>
+          </div>
+          <div className="flex justify-center md:justify-end">
+            <div className="flex items-center gap-6">
+              <img src={shapesRow} alt="" className="w-[600px] object-contain" />
+            </div>
           </div>
         </div>
-        <div>
-          <div className="rounded-xl2 border-4 border-primary-200 p-6 max-w-md ml-auto">
-            <div className="text-xl font-bold">2x + 4y = 7z</div>
+
+        {/* Вторая фича */}
+        <div className="grid md:grid-cols-2 gap-8 items-center">
+          <div className="flex justify-center">
+            <div className="flex items-center gap-6">
+              <img src={mascotHead} alt="" className="w-[300px] object-contain" />
+            </div>
           </div>
-          <div className="rounded-xl2 border-4 border-primary-200 p-6 max-w-md ml-auto mt-6">
-            <img src={shapesRow} alt="" className="w-full object-contain" />
+          <div>
+            <h2 className="text-3xl font-bold">ИИ проверка</h2>
+            <p className="mt-3 text-lg">
+              Решение автоматически проверяется с помощью 
+              <span className="text-primary-900 font-semibold"> Искусственного интеллекта </span>   
+              с подсветкой проблемных мест и советами!
+            </p>
           </div>
         </div>
       </section>
 
       {/* SUPPORTERS */}
-      <section className="bg-primary-500 text-white py-12 text-center">
-        <div className="container mx-auto">
+      <section className="bg-primary-500 text-white py-20 text-center">
+        <div className="container mx-auto max-w-6xl">
           <div className="text-2xl font-semibold mb-6">Нас поддерживают</div>
           <div className="flex items-center justify-center gap-10">
-            <img src={logoSber} alt="Сбер" className="h-10" />
-            <img src={logoCU} alt="Центральный университет" className="h-10" />
+            <img src={logoSber} alt="Сбер" className="h-[70px]" />
+            <img src={logoCU} alt="Центральный университет" className="h-[70px]" />
           </div>
         </div>
       </section>
 
       {/* CTA footer block */}
-      <section className="container mx-auto px-6 py-12 text-center">
-        <img src={mascotHead} alt="" className="mx-auto w-24 h-24 mb-4" />
-        <h3 className="text-2xl md:text-3xl font-bold">Прокачайте свой математический скилл с уточкой Мати!</h3>
+      <section className="container mx-auto max-w-6xl px-6 py-20 text-center">
+        <img src={mascotFace} alt="" className="mx-auto w-[300px] mb-4" />
+        <h3 className="text-2xl md:text-3xl font-bold">Прокачайте свой математический<br></br>скилл с уточкой Мати!</h3>
         <div className="mt-6 flex gap-4 justify-center">
           <Button onClick={() => navigate('/auth?tab=register')}>Зарегистрироваться</Button>
           <button
@@ -113,8 +131,8 @@ export default function WelcomePage() {
       </section>
 
       {/* FOOTER (упрощённая версия из макета) */}
-      <footer className="bg-primary-500 text-white py-10">
-        <div className="container mx-auto px-6 grid md:grid-cols-3 gap-8">
+      <footer className="bg-primary-500 text-white py-20">
+        <div className="container mx-auto max-w-6xl px-6 grid md:grid-cols-3 gap-8">
           <div>
             <div className="text-2xl font-bold">Мати</div>
           </div>
@@ -127,7 +145,7 @@ export default function WelcomePage() {
             <div className="opacity-90 mt-2">Вход<br/>Регистрация</div>
           </div>
         </div>
-        <div className="container mx-auto px-6 mt-8 text-sm opacity-90">Terms of service · Privacy policy</div>
+        <div className="container mx-auto max-w-6xl px-6 mt-8 text-sm opacity-90">Terms of service · Privacy policy</div>
       </footer>
     </div>
   );
