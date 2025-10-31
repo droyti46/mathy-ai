@@ -1,9 +1,25 @@
+"""FastAPI application entry point."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Allow running the module directly via ``python backend/app/main.py`` by
+# ensuring that the project root (``backend``) is on ``sys.path`` before any
+# package imports occur. Without this, Python cannot resolve the ``app``
+# package, leading to ``ModuleNotFoundError: No module named 'app'`` when the
+# script is executed outside of ``python -m`` context.
+if __package__ in {None, ""}:
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.logging import setup_logging
-from app.core.errors import register_handlers
+
+from app.api.routers import attempts, auth, chat, hints, solve, tasks, themes
 from app.bootstrap import build_container, init_db
-from app.api.routers import themes, tasks, attempts, hints, solve, chat, auth
+from app.core.errors import register_handlers
+from app.core.logging import setup_logging
 
 app = FastAPI(title="Math Trainer API", version="0.3.3")
 

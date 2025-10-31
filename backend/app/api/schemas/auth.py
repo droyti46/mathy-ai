@@ -1,23 +1,28 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
+
 
 class RegisterIn(BaseModel):
-    email: EmailStr
+    login: str
     password: str
-    name: str
+    name: str | None = None
+
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    login: str
     password: str
+
 
 class TokenPair(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
+
 class UserOut(BaseModel):
     id: str
-    email: EmailStr
-    name: str
+    login: str
+    name: str | None = None
+
 
 class StatsOut(BaseModel):
     solved: int

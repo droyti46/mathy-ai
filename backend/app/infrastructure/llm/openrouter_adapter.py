@@ -47,7 +47,10 @@ class OpenRouterAdapter(ILLM):
         return _safe_json(out)
 
     async def hint(self, task: str, chat_history: Sequence[Dict[str, str]]) -> str:
-        system = "You are a helpful tutor. Give a HINT only. Do NOT reveal the final numeric answer or the full solution."
+        system = (
+            "You are a vigilant math tutor. Analyse the student's reasoning, point out where the mistake occurs, "
+            "and suggest how to fix the approach. Under no circumstances provide the correct final answer or a full solution."
+        )
         messages = [{"role": "system", "content": system}]
         messages += [{"role": m["role"], "content": m["content"]} for m in chat_history]
         messages.append({"role": "user", "content": f"Task context:\n{task}"})
