@@ -13,6 +13,7 @@ from app.api.schemas.auth import (
 from app.core.deps import get_uow, get_settings
 from app.core.security import hash_password, verify_password, create_token, decode_token, get_current_user_opt
 from app.core.user_stats import default_user_stats, ensure_user_stats
+from app.core.attempts import is_attempt_solved
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -93,7 +94,9 @@ async def my_stats(
 ):
     db = await _resolve_user(uow, user, login, None)
     attempts = await uow.attempts.list_by_user(db["id"])
-    solved_by_attempts = sum(1 for a in attempts if (a.get("score") or 0) >= 0.99)
+    solved_by_attempts = sum(
+        1 for a in attempts if is_attempt_solved(a.get("score"), a.get("feedback"))
+    )
     stats = ensure_user_stats(db.get("stats"))
 
     attempts_count = max(int(stats.get("attempts", 0)), len(attempts))

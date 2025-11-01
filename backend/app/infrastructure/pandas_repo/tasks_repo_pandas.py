@@ -1,6 +1,7 @@
 from __future__ import annotations
 import pandas as pd, random, datetime
 from app.domain.tasks.entities import Task
+from app.core.attempts import is_attempt_solved
 
 class PandasTaskRepo:
     def __init__(self, path: str):
@@ -96,7 +97,7 @@ class PandasTaskRepo:
         if exclude_solved_by_user_id and attempts_repo:
             solved_task_ids = set()
             for a in await attempts_repo.list_by_user(exclude_solved_by_user_id):
-                if (a.get("score") or 0) >= 0.99:
+                if is_attempt_solved(a.get("score"), a.get("feedback")):
                     solved_task_ids.add(a["task_id"])
             df = df[~df["id"].astype(str).isin(solved_task_ids)]
 
