@@ -1,4 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
+
+
 import CloudField from '@/components/CloudField';
 import logoMathy from '@/assets/images/logo-mathy.png';
 import sun from '@/assets/images/sun-top-right.png';
@@ -6,7 +8,7 @@ import cloud1 from '@/assets/images/cloud-1.png';
 import cloud2 from '@/assets/images/cloud-2.png';
 import cloud3 from '@/assets/images/cloud-3.png';
 import mascotHead from '@/assets/images/mascot-head.png';
-import mascotFace from '@/assets/images/mascot-face.png';
+import mascotFaceWithoutPupils from '@/assets/images/mascot-face-without-pupils.png';
 import shapesRow from '@/assets/images/shapes-row.png';
 import logoSber from '@/assets/images/logo-sber.png';
 import logoCU from '@/assets/images/logo-central-university.png';
@@ -21,7 +23,9 @@ import icon7 from '@/assets/images/icon-optimization.png';
 import icon8 from '@/assets/images/icon-number-theory.png';
 import icon9 from '@/assets/images/icon-functional-analysis.png';
 import icon10 from '@/assets/images/icon-applied-math.png';
+
 import Button from '@/components/Button';
+import MascotEyes from "@/components/MascotEyes";
 
 export default function WelcomePage() {
   const navigate = useNavigate();
@@ -57,7 +61,7 @@ export default function WelcomePage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-center">
           {[icon1,icon2,icon3,icon4,icon5,icon6,icon7,icon8,icon9,icon10].map((src, i) => (
             <div key={i} className="flex flex-col items-center">
-              <img src={src} alt="" className="w-[60px] h-[60px] object-contain mb-2" />
+              <img src={src} alt="" className="w-[60px] h-[60px] object-contain mb-2 transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3 active:scale-95" />
               <div className="text-base">
                 {[
                   'Мат. анализ','Линал и геометрия','теор. вер. и статистика','дискретная математика','диффуры',
@@ -69,20 +73,20 @@ export default function WelcomePage() {
         </div>
       </section>
 
-{/* BANK + DEMO */}
+      {/* BANK + DEMO */}
       <section className="container mx-auto max-w-6xl px-6 py-16 space-y-16">
         {/* Первая фича */}
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div>
             <h2 className="text-3xl font-bold">Большой банк заданий</h2>
             <p className="mt-3 text-lg">
-              <span className="text-primary-900 font-semibold">1000+ задач</span> на 10 тем и 3 уровня сложности.  
+              <span className="text-primary-900 font-semibold">1000+ задач</span>, разделенных на 10 тем и 3 уровня сложности.  
               Каждый найдёт что-то для себя!
             </p>
           </div>
           <div className="flex justify-center md:justify-end">
             <div className="flex items-center gap-6">
-              <img src={shapesRow} alt="" className="w-[600px] object-contain" />
+              <img src={shapesRow} alt="" className="w-[400px] object-contain pointer-events-none" />
             </div>
           </div>
         </div>
@@ -91,7 +95,7 @@ export default function WelcomePage() {
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="flex justify-center">
             <div className="flex items-center gap-6">
-              <img src={mascotHead} alt="" className="w-[300px] object-contain" />
+              <img src={mascotHead} alt="" className="w-[600px] object-contain pointer-events-none" />
             </div>
           </div>
           <div>
@@ -110,15 +114,22 @@ export default function WelcomePage() {
         <div className="container mx-auto max-w-6xl">
           <div className="text-2xl font-semibold mb-6">Нас поддерживают</div>
           <div className="flex items-center justify-center gap-10">
-            <img src={logoSber} alt="Сбер" className="h-[70px]" />
-            <img src={logoCU} alt="Центральный университет" className="h-[70px]" />
+            <img src={logoSber} alt="Сбер" className="h-[70px] transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3 active:scale-95" />
+            <img src={logoCU} alt="Центральный университет" className="h-[70px] transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3 active:scale-95" />
           </div>
         </div>
       </section>
 
       {/* CTA footer block */}
       <section className="container mx-auto max-w-6xl px-6 py-20 text-center">
-        <img src={mascotFace} alt="" className="mx-auto w-[300px] mb-4" />
+        <MascotEyes
+          face={mascotFaceWithoutPupils}
+          leftEye={{ cxPct: 10, cyPct: 30, radiusPct: 45 }}
+          rightEye={{ cxPct: 90, cyPct: 30, radiusPct: 45 }}
+          pupilSize={40}
+          pupilColor='white'
+          className="mx-auto w-[300px] mb-6 pointer-events-none"
+        />
         <h3 className="text-2xl md:text-3xl font-bold">Прокачайте свой математический<br></br>скилл с уточкой Мати!</h3>
         <div className="mt-6 flex gap-4 justify-center">
           <Button onClick={() => navigate('/auth?tab=register')}>Зарегистрироваться</Button>

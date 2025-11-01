@@ -6,6 +6,8 @@ import TextInput from '@/components/TextInput';
 import Button from '@/components/Button';
 import { useAuthStore } from '@/lib/store/auth.store';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import MascotEyes from "@/components/MascotEyes";
+import mascotFaceWithoutPupils from '@/assets/images/mascot-face-without-pupils.png';
 
 export default function AuthPage() {
   const [sp, setSp] = useSearchParams();
@@ -108,7 +110,7 @@ export default function AuthPage() {
                   <div>
                     <label className="block mb-2">Логин</label>
                     <TextInput
-                      placeholder="Придумайте логин"
+                      placeholder="Введите логин"
                       value={loginVal}
                       onChange={(e) => setLoginVal(e.target.value)}
                       required
@@ -153,10 +155,11 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="!bg-white !text-primary-900 hover:!bg-primary-200 transition-colors"
+                    className="!bg-white !text-primary-900 hover:!bg-primary-200 transition-transform duration-200 hover:scale-105 active:scale-95"
                   >
                     {loading ? 'Загрузка...' : (tab==='register' ? 'Зарегистрироваться' : 'Войти')}
                   </Button>
+
                 </motion.form>
               </AnimatePresence>
             </div>
@@ -166,7 +169,14 @@ export default function AuthPage() {
 
       {/* RIGHT: mascot */}
       <div className="bg-white flex items-center justify-center">
-        <img src={mascotFace} alt="" className="w-72 md:w-[420px] object-contain" />
+        <MascotEyes
+          face={mascotFaceWithoutPupils}
+          leftEye={{ cxPct: 10, cyPct: 30, radiusPct: 42 }}
+          rightEye={{ cxPct: 90, cyPct: 30, radiusPct: 42  }}
+          pupilSize={60}
+          pupilColor='white'
+          className="mx-auto w-[420px] mb-6 pointer-events-none"
+        />
       </div>
     </div>
   );
