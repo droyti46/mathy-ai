@@ -6,11 +6,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.settings import Settings
+from app.settings import Settings, get_settings
 
 # локальный провайдер, чтобы не тянуть deps и не создавать цикл
 def _get_settings() -> Settings:
-    return Settings()
+    return get_settings()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 auth_scheme = HTTPBearer(auto_error=False)
@@ -41,7 +41,7 @@ async def get_current_user_opt(
         return None
     try:
         payload = decode_token(creds.credentials, settings.JWT_SECRET, settings.JWT_ALG)
-        return {"user_id": payload.get("sub"), "email": payload.get("email")}
+        return {"user_id": payload.get("sub"), "login": payload.get("login")}
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
