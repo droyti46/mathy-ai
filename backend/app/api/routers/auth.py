@@ -3,9 +3,17 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.schemas.auth import RegisterIn, LoginIn, TokenPair, UserOut, StatsOut
+from app.api.schemas.auth import (
+    RegisterIn,
+    LoginIn,
+    TokenPair,
+    UserOut,
+    StatsOut,
+)
 from app.core.deps import get_uow, get_settings
 from app.core.security import hash_password, verify_password, create_token, decode_token, get_current_user_opt
+from app.core.user_stats import default_user_stats, ensure_user_stats
+from app.core.attempts import is_attempt_solved
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -22,6 +30,7 @@ async def register(payload: RegisterIn, uow=Depends(get_uow)):
         "name": name,
         "login": payload.login,
         "password_hash": hash_password(payload.password),
+        "stats": default_user_stats(),
     }
     await uow.users.add(user)
     return UserOut(id=user_id, login=payload.login, name=name)
@@ -50,18 +59,53 @@ async def refresh_token(refresh_token: str, settings=Depends(get_settings)):
     return TokenPair(access_token=access, refresh_token=new_refresh)
 
 
-@router.get("/me", response_model=UserOut)
-async def me(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
-    if not user:
+async def _resolve_user(uow, user, login: str | None, name: str | None):
+    if login:
+        db = await uow.users.get_by_login(login)
+    elif name:
+        db = await uow.users.get_by_name(name)
+    elif user:
+        db = await uow.users.get(user["user_id"])
+    else:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    db = await uow.users.get(user["user_id"])
+
+    if not db:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return db
+
+
+@router.get("/me", response_model=UserOut)
+async def me(
+    login: str | None = None,
+    name: str | None = None,
+    user=Depends(get_current_user_opt),
+    uow=Depends(get_uow),
+):
+    db = await _resolve_user(uow, user, login, name)
     return UserOut(id=db["id"], login=db["login"], name=db.get("name") or db["login"])
 
 
 @router.get("/me/stats", response_model=StatsOut)
-async def my_stats(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    attempts = await uow.attempts.list_by_user(user["user_id"])
-    solved = sum(1 for a in attempts if (a.get("score") or 0) >= 0.99)
-    return StatsOut(solved=solved, attempts=len(attempts), streak_days=0)
+async def my_stats(
+    login: str | None = None,
+    user=Depends(get_current_user_opt),
+    uow=Depends(get_uow),
+):
+    db = await _resolve_user(uow, user, login, None)
+    attempts = await uow.attempts.list_by_user(db["id"])
+    solved_by_attempts = sum(
+        1 for a in attempts if is_attempt_solved(a.get("score"), a.get("feedback"))
+    )
+    stats = ensure_user_stats(db.get("stats"))
+
+    attempts_count = max(int(stats.get("attempts", 0)), len(attempts))
+    solved_count = max(int(stats.get("solved_tasks", 0)), solved_by_attempts)
+
+    return StatsOut(
+        solved=solved_count,
+        attempts=attempts_count,
+        streak_days=stats.get("streak_days", 0),
+        coins=stats.get("coins", 0),
+        solved_task_ids=list(stats.get("solved_task_ids", [])),
+    )

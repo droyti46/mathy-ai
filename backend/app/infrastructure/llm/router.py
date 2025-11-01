@@ -65,7 +65,6 @@ class LLMRouter(ILLM):
         """
         Возвращает dict:
           - summary: str
-          - spans: list[[start,end], ...]
           - score: float | None
         """
         if self.mock:

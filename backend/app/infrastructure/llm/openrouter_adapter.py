@@ -1,16 +1,18 @@
-import base64, json, anyio
+import base64
+import json
+
+import anyio
 from typing import Sequence, Dict, Any
 from openai import OpenAI
 from app.application.interfaces.llm import ILLM
 from app.settings import Settings
 import re
-import json
 
 def _safe_json(s: str) -> Dict[str, Any]:
     try:
         return json.loads(s)
     except Exception:
-        return {"summary": s.strip()[:1500], "spans": []}
+        return {"summary": s.strip()[:1500]}
 
 class OpenRouterAdapter(ILLM):
     def __init__(self, settings: Settings):
@@ -32,9 +34,7 @@ class OpenRouterAdapter(ILLM):
 
     async def check_solution(self, task: str, user_solution: str) -> Dict[str, Any]:
         system_lines = [
-            "You are a strict math grader. Output ONLY JSON with keys:",
-            '{"summary": "str", "spans": [{"start": 0, "end": 1, "message": "str", "severity": "error"|"warning"}]}',
-            "Indices refer to character positions in USER_SOLUTION.",
+            "You are a strict math grader. Output ONLY JSON with a single key 'summary' (string).",
             "No extra text outside JSON.",
         ]
         system = "\n".join(system_lines)
@@ -73,16 +73,16 @@ class OpenRouterAdapter(ILLM):
     
     async def grade(self, task_md: str, solution_text: str, reference: str = "") -> dict:
         system = (
-            "You are a strict math grader. "
-            "Return ONLY JSON with keys: summary (string), "
-            "spans (list of [start,end] integer pairs pointing to mistakes in the student's solution), "
-            "score (0..1, optional). "
-            "Never reveal the final numeric answer; provide formative feedback."
+            "Ты математический проверяющий. "
+            "Верни ТОЛЬКО JSON с ключами: summary (строка) и score (от 0 до 1, необязательный). "
+            "Не раскрывай конечный числовой ответ; дай содержательную обратную связь."
         )
+
         user = (
-            f"Task:\n{task_md}\n\n"
-            f"Student solution (plain text):\n{solution_text}\n\n"
-            f"Reference solution (optional):\n{reference}"
+            f"Задача:\n{task_md}\n\n"
+            f"Решение студента (текст):\n{solution_text}\n\n"
+            f"Эталонное решение (необязательно):\n{reference}\n\n"
+            "Отметь только действительно значимые ошибки — неверные шаги рассуждений, пропущенные случаи или неверные формулы."
         )
 
         # выберем модель для градинга: LLM_MODEL_GRADE если есть, иначе LLM_MODEL_CHECK
@@ -104,15 +104,22 @@ class OpenRouterAdapter(ILLM):
         try:
             data = json.loads(blob)
         except Exception:
-            data = {"summary": text[:500], "spans": []}
+            data = {"summary": text[:500]}
 
-        # нормализуем spans к [[a,b],...]
-        norm_spans = []
-        raw_spans = data.get("spans", [])
-        for item in raw_spans:
-            if isinstance(item, dict):
-                norm_spans.append([int(item.get("start", 0)), int(item.get("end", 0))])
-            elif isinstance(item, (list, tuple)) and len(item) >= 2:
-                norm_spans.append([int(item[0]), int(item[1])])
-        data["spans"] = norm_spans
+        # Если модель всё же вернула spans, аккуратно нормализуем, иначе удалим ключ.
+        raw_spans = data.get("spans")
+        if raw_spans:
+            norm_spans = []
+            for item in raw_spans:
+                if isinstance(item, dict):
+                    norm_spans.append([int(item.get("start", 0)), int(item.get("end", 0))])
+                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                    norm_spans.append([int(item[0]), int(item[1])])
+            if norm_spans:
+                data["spans"] = norm_spans
+            else:
+                data.pop("spans", None)
+        else:
+            data.pop("spans", None)
+
         return data

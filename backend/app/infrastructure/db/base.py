@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
@@ -20,6 +22,30 @@ async def _ensure_user_columns(conn: AsyncConnection) -> None:
 
     if "name" not in column_names:
         await conn.execute(text("ALTER TABLE users ADD COLUMN name TEXT DEFAULT '' NOT NULL"))
+
+    if "stats" not in column_names:
+        default_stats_json = json.dumps(
+            {
+                "coins": 0,
+                "solved_tasks": 0,
+                "solved_task_ids": [],
+                "streak_days": 0,
+                "attempts": 0,
+            }
+        )
+        default_stats_sql_literal = default_stats_json.replace("'", "''")
+        alter_stats_column_sql = (
+            "ALTER TABLE users ADD COLUMN stats TEXT DEFAULT '"
+            + default_stats_sql_literal
+            + "'"
+        )
+        await conn.execute(text(alter_stats_column_sql))
+        await conn.execute(
+            text(
+                "UPDATE users SET stats = :default_stats WHERE stats IS NULL"
+            ),
+            {"default_stats": default_stats_json},
+        )
 
     indexes_result = await conn.execute(text("PRAGMA index_list(users)"))
     index_names = {row[1] for row in indexes_result}

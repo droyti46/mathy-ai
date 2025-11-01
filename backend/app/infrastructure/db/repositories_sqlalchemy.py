@@ -1,10 +1,11 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 
-from sqlalchemy import select, insert, desc
+from sqlalchemy import select, insert, desc, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.db import models as m
+from app.core.user_stats import ensure_user_stats, default_user_stats
 
 
 def _to_iso_utc(dt: Optional[datetime]) -> Optional[str]:
@@ -39,6 +40,7 @@ def _user_to_dict(u: m.User) -> Dict[str, Any]:
         "login": u.login,
         "password_hash": u.password_hash,
         "created_at": _to_iso_utc(u.created_at),
+        "stats": ensure_user_stats(u.stats),
     }
 
 
@@ -129,15 +131,31 @@ class SqlUserRepo:
         self.session = session
 
     async def add(self, user: dict):
-        await self.session.execute(insert(m.User).values(**user))
+        payload = dict(user)
+        if "stats" not in payload or not isinstance(payload["stats"], dict):
+            payload["stats"] = default_user_stats()
+        await self.session.execute(insert(m.User).values(**payload))
         await self.session.commit()
 
     async def get(self, user_id: str) -> Optional[dict]:
         res = await self.session.execute(select(m.User).where(m.User.id == user_id))
         row = res.scalar_one_or_none()
-        return _user_to_dict(row) if row else None
+        if not row:
+            return None
+        return _user_to_dict(row)
 
     async def get_by_login(self, login: str) -> Optional[dict]:
         res = await self.session.execute(select(m.User).where(m.User.login == login))
         row = res.scalar_one_or_none()
         return _user_to_dict(row) if row else None
+
+    async def get_by_name(self, name: str) -> Optional[dict]:
+        res = await self.session.execute(select(m.User).where(m.User.name == name))
+        row = res.scalar_one_or_none()
+        return _user_to_dict(row) if row else None
+
+    async def update_stats(self, user_id: str, stats: Dict[str, Any]) -> None:
+        await self.session.execute(
+            update(m.User).where(m.User.id == user_id).values(stats=stats)
+        )
+        await self.session.commit()
