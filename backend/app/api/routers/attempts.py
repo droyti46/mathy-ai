@@ -17,7 +17,7 @@ router = APIRouter(prefix="/attempts", tags=["attempts"])
 def _build_feedback(raw_result: dict) -> Feedback:
     """
     Принимает сырые данные от градерa и формирует Feedback:
-    - feedback.spans => [[start,end], ...]
+    - feedback.spans => [[start,end], ...] (используются только внутри бэкенда)
     - feedback.spans_detail => List[Span]
     """
     summary = raw_result.get("summary", "")
