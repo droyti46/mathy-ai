@@ -6,13 +6,7 @@ from app.core.attempts import is_attempt_solved
 class PandasTaskRepo:
     def __init__(self, path: str):
         self.path = path
-        try:
-            if path.endswith(".parquet"):
-                df = pd.read_parquet(path)
-            else:
-                df = pd.read_csv(path)
-        except Exception:
-            df = pd.DataFrame(columns=["id","theme_id","difficulty","statement_md","reference_solution_md","source","tags"])
+        df = pd.read_csv(path)
 
         columns_lower = {str(c).strip().lower(): c for c in df.columns}
 
@@ -36,6 +30,7 @@ class PandasTaskRepo:
         ensure_column("reference_solution_md", ["solution", "reference_solution", "решение"], "")
         ensure_column("theme_id", ["theme", "тема"], "math")
         ensure_column("difficulty", ["уровень сложности", "сложность", "level"], "easy")
+        ensure_column("name", ["Название"], "Задача")
         ensure_column("source", [], "")
         ensure_column("tags", [], "")
 
@@ -73,7 +68,7 @@ class PandasTaskRepo:
         r = rows.iloc[0]
         tags = r.get("tags", "")
         tags = [t.strip() for t in str(tags).split(",")] if tags else []
-        return Task(id=str(r["id"]), theme_id=str(r.get("theme_id","math")),
+        return Task(id=str(r["id"]), theme_id=str(r.get("theme_id","math")), name=str(r['name']),
                     difficulty=str(r.get("difficulty","easy")), statement_md=str(r["statement_md"]),
                     reference_solution_md=str(r.get("reference_solution_md") or ""), source=str(r.get("source") or ""), tags=tags)
 
@@ -111,7 +106,7 @@ class PandasTaskRepo:
         for _, r in df.iloc[offset: offset+limit].iterrows():
             tags = r.get("tags", "")
             tags = [t.strip() for t in str(tags).split(",")] if tags else []
-            out.append(Task(id=str(r["id"]), theme_id=str(r.get("theme_id","math")),
+            out.append(Task(id=str(r["id"]), theme_id=str(r.get("theme_id","math")), name=str(r['name']),
                             difficulty=str(r.get("difficulty","easy")), statement_md=str(r["statement_md"]),
                             reference_solution_md=str(r.get("reference_solution_md") or ""), source=str(r.get("source") or ""), tags=tags))
         return out
