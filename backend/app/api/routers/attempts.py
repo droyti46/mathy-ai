@@ -1,5 +1,5 @@
 # app/api/routers/attempts.py (фрагменты)
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from app.api.schemas.attempt import AttemptIn, AttemptOut, Feedback, Span
 from app.api.schemas.auth import StatsOut
 from app.core.deps import get_uow, get_llm, get_ocr, get_user_opt
@@ -43,6 +43,17 @@ def _build_feedback(raw_result: dict) -> Feedback:
             spans_pairs.append([start, end])
 
     return Feedback(summary=summary, spans=spans_pairs, spans_detail=spans_detail)
+
+async def _resolve_user_id(uow, user: dict | None, login: str | None) -> str | None:
+    if user and user.get("user_id"):
+        return user.get("user_id")
+
+    if login:
+        db_user = await uow.users.get_by_login(login)
+        if db_user:
+            return db_user.get("id")
+
+    return None
 
 async def _maybe_update_user_stats(
     uow,
@@ -112,7 +123,7 @@ async def create_attempt(
 
     now = _now_iso()
 
-    user_id = user["user_id"] if user else None
+    user_id = await _resolve_user_id(uow, user, payload.login)
 
     attempt_id = await uow.attempts.save({
         "task_id": payload.task_id,
@@ -151,6 +162,7 @@ async def create_attempt(
 @router.post("/file", response_model=AttemptOut)
 async def create_attempt_file(
     task_id: str,
+    login: str | None = Form(None),
     file: UploadFile = File(...),
     uow = Depends(get_uow),
     ocr: VisionOCROpenRouter = Depends(get_ocr),
@@ -171,7 +183,7 @@ async def create_attempt_file(
 
     now = _now_iso()
 
-    user_id = user["user_id"] if user else None
+    user_id = await _resolve_user_id(uow, user, login)
 
     attempt_id = await uow.attempts.save({
         "task_id": task_id,
