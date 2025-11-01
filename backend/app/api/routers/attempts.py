@@ -5,7 +5,7 @@ from app.core.deps import get_uow, get_llm, get_ocr, get_user_opt
 from datetime import datetime, timezone
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
 from app.application.markers import postprocess_marked_text
-from app.core.user_stats import coins_for_difficulty
+from app.core.user_stats import coins_for_difficulty, ensure_user_stats
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -46,9 +46,11 @@ async def _maybe_update_user_stats(uow, user_id: str | None, task_id: str, task_
     if not user_id or score is None or score < 0.99:
         return
 
-    stats = await uow.users.get_stats(user_id)
-    if stats is None:
+    db_user = await uow.users.get(user_id)
+    if not db_user:
         return
+
+    stats = ensure_user_stats(db_user.get("stats"))
     task_id_str = str(task_id)
     if task_id_str in stats["solved_task_ids"]:
         return

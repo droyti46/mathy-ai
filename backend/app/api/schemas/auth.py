@@ -32,12 +32,3 @@ class StatsOut(BaseModel):
     streak_days: int = 0
     coins: int = 0
     solved_task_ids: List[str] = Field(default_factory=list)
-
-
-class TaskSolvedOut(BaseModel):
-    task_id: str
-    solved: bool
-
-
-class SolvedCountOut(BaseModel):
-    solved: int
