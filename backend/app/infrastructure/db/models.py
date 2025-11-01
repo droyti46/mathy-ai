@@ -5,6 +5,7 @@ from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON
 from datetime import datetime, timezone
 from uuid import uuid4
 from app.infrastructure.db.base import Base
+from app.core.user_stats import default_user_stats
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -19,6 +20,7 @@ class User(Base):
     login: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)  # ← DateTime
+    stats: Mapped[dict] = mapped_column(SQLITE_JSON, default=default_user_stats)
 
 class Attempt(Base):
     __tablename__ = "attempts"
