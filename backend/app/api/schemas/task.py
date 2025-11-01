@@ -6,6 +6,7 @@ Difficulty = Literal["easy","medium","hard"]
 class TaskOut(BaseModel):
     id: str
     theme_id: str
+    name: str
     difficulty: Difficulty
     statement_md: str
     source: Optional[str] = None
