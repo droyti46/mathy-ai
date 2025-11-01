@@ -21,6 +21,23 @@ async def _ensure_user_columns(conn: AsyncConnection) -> None:
     if "name" not in column_names:
         await conn.execute(text("ALTER TABLE users ADD COLUMN name TEXT DEFAULT '' NOT NULL"))
 
+    if "stats" not in column_names:
+        default_stats_json = (
+            '{"coins":0,"solved_tasks":0,"solved_task_ids":[],"streak_days":0}'
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN stats TEXT DEFAULT :default_stats"
+            ),
+            {"default_stats": default_stats_json},
+        )
+        await conn.execute(
+            text(
+                "UPDATE users SET stats = :default_stats WHERE stats IS NULL"
+            ),
+            {"default_stats": default_stats_json},
+        )
+
     indexes_result = await conn.execute(text("PRAGMA index_list(users)"))
     index_names = {row[1] for row in indexes_result}
 

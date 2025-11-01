@@ -140,7 +140,13 @@ class SqlUserRepo:
     async def get(self, user_id: str) -> Optional[dict]:
         res = await self.session.execute(select(m.User).where(m.User.id == user_id))
         row = res.scalar_one_or_none()
-        return _user_to_dict(row) if row else None
+        if not row:
+            return None
+        data = _user_to_dict(row)
+        stats = await self.get_stats(user_id, row.stats)
+        if stats is not None:
+            data["stats"] = stats
+        return data
 
     async def get_by_login(self, login: str) -> Optional[dict]:
         res = await self.session.execute(select(m.User).where(m.User.login == login))

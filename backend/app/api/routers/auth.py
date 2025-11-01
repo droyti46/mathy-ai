@@ -3,7 +3,15 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.schemas.auth import RegisterIn, LoginIn, TokenPair, UserOut, StatsOut
+from app.api.schemas.auth import (
+    RegisterIn,
+    LoginIn,
+    TokenPair,
+    UserOut,
+    StatsOut,
+    TaskSolvedOut,
+    SolvedCountOut,
+)
 from app.core.deps import get_uow, get_settings
 from app.core.security import hash_password, verify_password, create_token, decode_token, get_current_user_opt
 from app.core.user_stats import default_user_stats, ensure_user_stats
