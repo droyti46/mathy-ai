@@ -58,22 +58,42 @@ async def refresh_token(refresh_token: str, settings=Depends(get_settings)):
     return TokenPair(access_token=access, refresh_token=new_refresh)
 
 
-@router.get("/me", response_model=UserOut)
-async def me(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
-    if not user:
+async def _resolve_user(uow, user, login: str | None, name: str | None):
+    if login:
+        db = await uow.users.get_by_login(login)
+    elif name:
+        db = await uow.users.get_by_name(name)
+    elif user:
+        db = await uow.users.get(user["user_id"])
+    else:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    db = await uow.users.get(user["user_id"])
+
+    if not db:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return db
+
+
+@router.get("/me", response_model=UserOut)
+async def me(
+    login: str | None = None,
+    name: str | None = None,
+    user=Depends(get_current_user_opt),
+    uow=Depends(get_uow),
+):
+    db = await _resolve_user(uow, user, login, name)
     return UserOut(id=db["id"], login=db["login"], name=db.get("name") or db["login"])
 
 
 @router.get("/me/stats", response_model=StatsOut)
-async def my_stats(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    db = await uow.users.get(user["user_id"])
-    if not db:
-        raise HTTPException(status_code=404, detail="User not found")
-    attempts = await uow.attempts.list_by_user(user["user_id"])
+async def my_stats(
+    login: str | None = None,
+    name: str | None = None,
+    user=Depends(get_current_user_opt),
+    uow=Depends(get_uow),
+):
+    db = await _resolve_user(uow, user, login, name)
+    attempts = await uow.attempts.list_by_user(db["id"])
     solved = sum(1 for a in attempts if (a.get("score") or 0) >= 0.99)
     stats = ensure_user_stats(db.get("stats"))
     return StatsOut(
