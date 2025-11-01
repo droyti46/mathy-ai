@@ -13,7 +13,7 @@ class Span(BaseModel):
 class Feedback(BaseModel):
     summary: str = ""
     # ТВОЙ формат подсветки:
-    spans: List[List[int]] = Field(default_factory=list)
+    spans: List[List[int]] = Field(default_factory=list, exclude=True)
     # Подробности (для возможных тултипов):
     spans_detail: List[Span] = Field(default_factory=list)
 
