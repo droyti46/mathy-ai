@@ -1,5 +1,5 @@
 from __future__ import annotations
-import pandas as pd, random, datetime
+import pandas as pd, datetime
 from app.domain.tasks.entities import Task
 from app.core.attempts import is_attempt_solved
 
@@ -61,6 +61,18 @@ class PandasTaskRepo:
             df["id"] = df.index.astype(str)
         self.df = df.fillna("")
 
+        # === NEW: стабильное индексирование тем (в порядке первого появления) ===
+        # порядок первого появления максимально «ничего не меняет», чтобы номера не скакали
+        themes_in_order = list(dict.fromkeys(self.df["theme_id"].astype(str)))
+        self._idx_to_theme: dict[str, str] = {str(i): t for i, t in enumerate(themes_in_order)}
+        self._theme_to_idx: dict[str, str] = {t: str(i) for i, t in enumerate(themes_in_order)}
+        # заранее посчитаем количества
+        self._theme_counts: dict[str, int] = (
+            self.df.groupby("theme_id").size().astype(int).to_dict()
+            if "theme_id" in self.df.columns and not self.df.empty else {}
+        )
+        # =========================================================
+
     async def get(self, task_id: str) -> Task | None:
         rows = self.df[self.df["id"].astype(str) == str(task_id)]
         if rows.empty:
@@ -77,8 +89,14 @@ class PandasTaskRepo:
                    limit: int = 50, offset: int = 0,
                    exclude_solved_by_user_id: str | None = None, attempts_repo=None):
         df = self.df
+
+        # === CHANGED: принимаем и старый theme_id, и новый числовой id ===
         if theme_id:
-            df = df[df["theme_id"].astype(str) == str(theme_id)]
+            # если пришёл числовой индекс — переводим его в исходный theme_id
+            real_theme = self._idx_to_theme.get(str(theme_id), theme_id)
+            df = df[df["theme_id"].astype(str) == str(real_theme)]
+        # ===============================================================
+
         if difficulty:
             df = df[df["difficulty"].astype(str) == str(difficulty)]
         if tags:
@@ -112,17 +130,40 @@ class PandasTaskRepo:
         return out
 
     async def list_themes(self):
+        # === CHANGED: id = порядковый номер (строкой), title = theme_id.lower() ===
         if "theme_id" not in self.df.columns or self.df.empty:
-            return [{"id":"math","title":"Математика", "count": 0, "description": ""}]
-        g = self.df.groupby("theme_id").size().reset_index(name="count")
-        return [{"id": str(r["theme_id"]), "title": str(r["theme_id"]).title(), "count": int(r["count"]), "description": ""} for _, r in g.iterrows()]
+            return [{"id": "0", "title": "математика", "count": 0, "description": ""}]
+
+        items = []
+        # идём по зафиксированному порядку, чтобы нумерация была стабильной
+        for idx_str, theme in self._idx_to_theme.items():
+            items.append({
+                "id": idx_str,                    # новый числовой id
+                "title": str(theme).lower(),      # нижний регистр оригинального theme_id
+                "count": int(self._theme_counts.get(theme, 0)),
+                "description": ""
+            })
+        return items
+        # ================================================================
 
     async def get_theme(self, theme_id: str):
-        lst = await self.list_themes()
-        for t in lst:
-            if t["id"] == theme_id:
-                return t
-        return {"id": theme_id, "title": theme_id.title(), "count": 0, "description": ""}
+        # === CHANGED: поддерживаем и числовой id, и исходный theme_id на входе ===
+        # если передали индекс — получим исходный theme_id
+        if str(theme_id) in self._idx_to_theme:
+            theme = self._idx_to_theme[str(theme_id)]
+            idx_str = str(theme_id)
+        else:
+            # передали старый theme_id — найдём его индекс (если есть)
+            theme = str(theme_id)
+            idx_str = self._theme_to_idx.get(theme, "0")
+
+        return {
+            "id": idx_str,
+            "title": str(theme).lower(),
+            "count": int(self._theme_counts.get(theme, 0)),
+            "description": ""
+        }
+        # =================================================================
 
     async def daily_task(self):
         today = datetime.date.today()
