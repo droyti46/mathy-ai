@@ -2,6 +2,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
+from app.api.schemas.auth import StatsOut
+
 class Span(BaseModel):
     start: int
     end: int
@@ -36,3 +38,6 @@ class AttemptOut(BaseModel):
     feedback: Feedback
     score: Optional[float] = None
     created_at: str
+    is_solved: bool = False
+    coins_rewarded: int = 0
+    stats: Optional[StatsOut] = None
