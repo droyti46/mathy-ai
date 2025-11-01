@@ -42,12 +42,28 @@ def _build_feedback(raw_result: dict) -> Feedback:
 
     return Feedback(summary=summary, spans=spans_pairs, spans_detail=spans_detail)
 
-async def _maybe_update_user_stats(uow, user_id: str | None, task_id: str, task_difficulty: str | None, score: float | None):
-    if not user_id or score is None or score < 0.99:
+async def _maybe_update_user_stats(
+    uow,
+    user_id: str | None,
+    task_id: str,
+    task_difficulty: str | None,
+    score: float | None,
+    feedback: Feedback,
+):
+    if not user_id:
         return
 
     db_user = await uow.users.get(user_id)
     if not db_user:
+        return
+
+    solved = False
+    if not feedback.spans_detail:
+        solved = True
+    elif score is not None and score >= 0.99:
+        solved = True
+
+    if not solved:
         return
 
     stats = ensure_user_stats(db_user.get("stats"))
@@ -102,7 +118,7 @@ async def create_attempt(
         "user_id": user_id,
     })
 
-    await _maybe_update_user_stats(uow, user_id, payload.task_id, task.difficulty, score)
+    await _maybe_update_user_stats(uow, user_id, payload.task_id, task.difficulty, score, fb)
 
     return AttemptOut(
         id=str(attempt_id),
@@ -148,7 +164,7 @@ async def create_attempt_file(
         "user_id": user_id,
     })
 
-    await _maybe_update_user_stats(uow, user_id, task_id, task.difficulty, None)
+    await _maybe_update_user_stats(uow, user_id, task_id, task.difficulty, None, feedback)
 
     return AttemptOut(
         id=str(attempt_id),

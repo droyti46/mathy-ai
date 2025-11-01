@@ -20,7 +20,7 @@ class VisionOCROpenRouter:
         base_url: str = "https://openrouter.ai/api/v1",
         trust_env: bool = True,
     ):
-        self.model = model or "openai/gpt-4o-mini"
+        self.model = model or "google/gemini-2.5-flash"
         self.api_key = api_key or ""
         self.base_url = base_url.rstrip("/")
         self.trust_env = trust_env
