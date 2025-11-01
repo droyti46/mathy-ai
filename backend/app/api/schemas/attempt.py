@@ -22,6 +22,7 @@ class AttemptIn(BaseModel):
     text: str = Field(min_length=15)
     mode: str = "solve"  # "solve" | "learn"
     time_spent_sec: Optional[int] = None
+    login: Optional[str] = None
 
     @field_validator("text")
     @classmethod
