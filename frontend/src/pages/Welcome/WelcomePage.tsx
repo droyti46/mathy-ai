@@ -10,6 +10,7 @@ import cloud3 from '@/assets/images/cloud-3.png';
 import mascotHead from '@/assets/images/mascot-head.png';
 import mascotFaceWithoutPupils from '@/assets/images/mascot-face-without-pupils.png';
 import shapesRow from '@/assets/images/shapes-row.png';
+import photographyCheck from '@/assets/images/photography-check.png';
 import logoSber from '@/assets/images/logo-sber.png';
 import logoCU from '@/assets/images/logo-central-university.png';
 
@@ -61,10 +62,10 @@ export default function WelcomePage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-center">
           {[icon1,icon2,icon3,icon4,icon5,icon6,icon7,icon8,icon9,icon10].map((src, i) => (
             <div key={i} className="flex flex-col items-center">
-              <img src={src} alt="" className="w-[60px] h-[60px] object-contain mb-2 transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3 active:scale-95" />
+              <img src={src} alt="" className="w-[200px] object-contain mb-2 transition-transform duration-300 ease-out hover:scale-110 hover:rotate-3 active:scale-95" />
               <div className="text-base">
                 {[
-                  'Мат. анализ','Линал и геометрия','теор. вер. и статистика','дискретная математика','диффуры',
+                  'мат. анализ','линал и геометрия','теор. вер. и статистика','дискретная математика','диффуры',
                   'численные методы','оптимизация','теория чисел','функц. анализ','прикладная математика'
                 ][i]}
               </div>
@@ -107,6 +108,22 @@ export default function WelcomePage() {
             </p>
           </div>
         </div>
+
+        {/* Третья фича */}
+        <div className="grid md:grid-cols-2 gap-8 items-center">
+          <div>
+            <h2 className="text-3xl font-bold">Проверка по фотографии</h2>
+            <p className="mt-3 text-lg">
+              Наши <span className="text-primary-900 font-semibold">алгоритмы с ИИ</span> способны распознать ваше решение даже на фотографиях!
+              Решайте задачи, как вам удобнее
+            </p>
+          </div>
+          <div className="flex justify-center md:justify-end">
+            <div className="flex items-center gap-6">
+              <img src={photographyCheck} alt="" className="w-[600px] object-contain pointer-events-none" />
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* SUPPORTERS */}
@@ -130,7 +147,7 @@ export default function WelcomePage() {
           pupilColor='white'
           className="mx-auto w-[300px] mb-6 pointer-events-none"
         />
-        <h3 className="text-2xl md:text-3xl font-bold">Прокачайте свой математический<br></br>скилл с уточкой Мати!</h3>
+        <h3 className="text-2xl md:text-3xl font-bold">Прокачайте свой математический<br></br>скилл с утёнком Мати!</h3>
         <div className="mt-6 flex gap-4 justify-center">
           <Button onClick={() => navigate('/auth?tab=register')}>Зарегистрироваться</Button>
           <button
