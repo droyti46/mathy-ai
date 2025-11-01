@@ -1,10 +1,11 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 
-from sqlalchemy import select, insert, desc
+from sqlalchemy import select, insert, desc, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.db import models as m
+from app.core.user_stats import ensure_user_stats, default_user_stats
 
 
 def _to_iso_utc(dt: Optional[datetime]) -> Optional[str]:
@@ -39,6 +40,7 @@ def _user_to_dict(u: m.User) -> Dict[str, Any]:
         "login": u.login,
         "password_hash": u.password_hash,
         "created_at": _to_iso_utc(u.created_at),
+        "stats": ensure_user_stats(u.stats),
     }
 
 
@@ -129,15 +131,95 @@ class SqlUserRepo:
         self.session = session
 
     async def add(self, user: dict):
-        await self.session.execute(insert(m.User).values(**user))
+        payload = dict(user)
+        if "stats" not in payload or not isinstance(payload["stats"], dict):
+            payload["stats"] = default_user_stats()
+        await self.session.execute(insert(m.User).values(**payload))
         await self.session.commit()
 
     async def get(self, user_id: str) -> Optional[dict]:
         res = await self.session.execute(select(m.User).where(m.User.id == user_id))
         row = res.scalar_one_or_none()
-        return _user_to_dict(row) if row else None
+        if not row:
+            return None
+        data = _user_to_dict(row)
+        stats = await self.get_stats(user_id, row.stats)
+        if stats is not None:
+            data["stats"] = stats
+        return data
 
     async def get_by_login(self, login: str) -> Optional[dict]:
         res = await self.session.execute(select(m.User).where(m.User.login == login))
         row = res.scalar_one_or_none()
-        return _user_to_dict(row) if row else None
+        if not row:
+            return None
+        data = _user_to_dict(row)
+        stats = await self.get_stats(row.id, row.stats)
+        if stats is not None:
+            data["stats"] = stats
+        return data
+
+    async def update_stats(self, user_id: str, stats: Dict[str, Any]) -> None:
+        normalized = ensure_user_stats(stats)
+        await self.session.execute(
+            update(m.User).where(m.User.id == user_id).values(stats=normalized)
+        )
+        await self.session.commit()
+
+    async def get_stats(
+        self, user_id: str, existing_stats: Dict[str, Any] | None = None
+    ) -> Optional[Dict[str, Any]]:
+        if existing_stats is None:
+            res = await self.session.execute(
+                select(m.User.stats).where(m.User.id == user_id)
+            )
+            row = res.one_or_none()
+            if row is None:
+                return None
+            stats = ensure_user_stats(row[0])
+        else:
+            stats = ensure_user_stats(existing_stats)
+
+        synced = await self._sync_solved_from_attempts(user_id, stats)
+        return ensure_user_stats(synced)
+
+    async def has_solved_task(self, user_id: str, task_id: str) -> bool:
+        stats = await self.get_stats(user_id)
+        if stats is None:
+            return False
+        return str(task_id) in stats.get("solved_task_ids", [])
+
+    async def count_solved_tasks(self, user_id: str) -> int:
+        stats = await self.get_stats(user_id)
+        if not stats:
+            return 0
+        return len(stats.get("solved_task_ids", []))
+
+    async def _sync_solved_from_attempts(
+        self, user_id: str, stats: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        normalized = ensure_user_stats(stats)
+        res = await self.session.execute(
+            select(m.Attempt.task_id).where(
+                m.Attempt.user_id == user_id,
+                m.Attempt.score >= 0.99,
+            )
+        )
+        attempt_ids = [str(task_id) for task_id in res.scalars().all()]
+        merged_ids: list[str] = []
+        seen: set[str] = set()
+        for task_id in normalized.get("solved_task_ids", []) + attempt_ids:
+            if task_id not in seen:
+                seen.add(task_id)
+                merged_ids.append(task_id)
+
+        if (
+            merged_ids != normalized.get("solved_task_ids", [])
+            or normalized.get("solved_tasks") != len(merged_ids)
+        ):
+            normalized = dict(normalized)
+            normalized["solved_task_ids"] = merged_ids
+            normalized["solved_tasks"] = len(merged_ids)
+            await self.update_stats(user_id, normalized)
+
+        return normalized

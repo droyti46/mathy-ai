@@ -3,9 +3,18 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.schemas.auth import RegisterIn, LoginIn, TokenPair, UserOut, StatsOut
+from app.api.schemas.auth import (
+    RegisterIn,
+    LoginIn,
+    TokenPair,
+    UserOut,
+    StatsOut,
+    TaskSolvedOut,
+    SolvedCountOut,
+)
 from app.core.deps import get_uow, get_settings
 from app.core.security import hash_password, verify_password, create_token, decode_token, get_current_user_opt
+from app.core.user_stats import default_user_stats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -22,6 +31,7 @@ async def register(payload: RegisterIn, uow=Depends(get_uow)):
         "name": name,
         "login": payload.login,
         "password_hash": hash_password(payload.password),
+        "stats": default_user_stats(),
     }
     await uow.users.add(user)
     return UserOut(id=user_id, login=payload.login, name=name)
@@ -62,6 +72,33 @@ async def me(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
 async def my_stats(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    stats = await uow.users.get_stats(user["user_id"])
+    if stats is None:
+        raise HTTPException(status_code=404, detail="User not found")
     attempts = await uow.attempts.list_by_user(user["user_id"])
-    solved = sum(1 for a in attempts if (a.get("score") or 0) >= 0.99)
-    return StatsOut(solved=solved, attempts=len(attempts), streak_days=0)
+    solved = len(stats.get("solved_task_ids", []))
+    return StatsOut(
+        solved=solved,
+        attempts=len(attempts),
+        streak_days=stats.get("streak_days", 0),
+        coins=stats.get("coins", 0),
+        solved_task_ids=stats.get("solved_task_ids", []),
+    )
+
+
+@router.get("/me/solved/{task_id}", response_model=TaskSolvedOut)
+async def task_solved_status(
+    task_id: str, user=Depends(get_current_user_opt), uow=Depends(get_uow)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    solved = await uow.users.has_solved_task(user["user_id"], task_id)
+    return TaskSolvedOut(task_id=str(task_id), solved=bool(solved))
+
+
+@router.get("/me/solved-count", response_model=SolvedCountOut)
+async def solved_tasks_count(user=Depends(get_current_user_opt), uow=Depends(get_uow)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    solved = await uow.users.count_solved_tasks(user["user_id"])
+    return SolvedCountOut(solved=solved)
