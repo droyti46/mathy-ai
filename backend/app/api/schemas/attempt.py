@@ -1,5 +1,5 @@
 # app/api/schemas/attempt.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
 class Span(BaseModel):
@@ -17,9 +17,16 @@ class Feedback(BaseModel):
 
 class AttemptIn(BaseModel):
     task_id: str
-    text: str
+    text: str = Field(min_length=15)
     mode: str = "solve"  # "solve" | "learn"
     time_spent_sec: Optional[int] = None
+
+    @field_validator("text")
+    @classmethod
+    def _ensure_min_length(cls, value: str) -> str:
+        if len(value.strip()) < 15:
+            raise ValueError("Solution must be at least 15 characters long")
+        return value
 
 class AttemptOut(BaseModel):
     id: str
