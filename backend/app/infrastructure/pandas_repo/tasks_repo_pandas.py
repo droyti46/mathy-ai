@@ -12,6 +12,55 @@ class PandasTaskRepo:
                 df = pd.read_csv(path)
         except Exception:
             df = pd.DataFrame(columns=["id","theme_id","difficulty","statement_md","reference_solution_md","source","tags"])
+
+        columns_lower = {str(c).strip().lower(): c for c in df.columns}
+
+        def pick(*names):
+            for n in names:
+                key = n.strip().lower()
+                if key in columns_lower:
+                    return columns_lower[key]
+            return None
+
+        def ensure_column(name: str, source_names: list[str], default: str = ""):
+            if name in df.columns:
+                return
+            src = pick(name, *source_names)
+            if src:
+                df[name] = df[src]
+            else:
+                df[name] = default
+
+        ensure_column("statement_md", ["statement", "task", "текст", "условие"], "")
+        ensure_column("reference_solution_md", ["solution", "reference_solution", "решение"], "")
+        ensure_column("theme_id", ["theme", "тема"], "math")
+        ensure_column("difficulty", ["уровень сложности", "сложность", "level"], "easy")
+        ensure_column("source", [], "")
+        ensure_column("tags", [], "")
+
+        diff_map = {
+            "легкий": "easy",
+            "лёгкий": "easy",
+            "easy": "easy",
+            "простой": "easy",
+            "medium": "medium",
+            "средний": "medium",
+            "нормальный": "medium",
+            "сложный": "hard",
+            "hard": "hard",
+            "тяжелый": "hard",
+            "тяжёлый": "hard",
+        }
+
+        def normalize_difficulty(value):
+            if value is None or value == "":
+                return "easy"
+            return diff_map.get(str(value).strip().lower(), "medium")
+
+        df["statement_md"] = df["statement_md"].fillna("").astype(str)
+        df["reference_solution_md"] = df["reference_solution_md"].fillna("").astype(str)
+        df["theme_id"] = df["theme_id"].fillna("math").astype(str)
+        df["difficulty"] = df["difficulty"].apply(normalize_difficulty)
         if "id" not in df.columns:
             df["id"] = df.index.astype(str)
         self.df = df.fillna("")
