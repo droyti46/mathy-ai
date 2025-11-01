@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
 from app.application.markers import postprocess_marked_text
 from app.core.user_stats import coins_for_difficulty, ensure_user_stats
+from app.core.attempts import is_attempt_solved
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -48,7 +49,7 @@ async def _maybe_update_user_stats(
     user_id: str | None,
     task_id: str,
     task_difficulty: str | None,
-    score: float | None,
+    is_solved_attempt: bool,
 ):
     if not user_id:
         return None
@@ -61,7 +62,7 @@ async def _maybe_update_user_stats(
     stats["attempts"] = int(stats.get("attempts", 0)) + 1
 
     task_id_str = str(task_id)
-    solved = score is not None and score >= 0.99
+    solved = bool(is_solved_attempt)
     coins_rewarded = 0
 
     if solved and task_id_str not in stats["solved_task_ids"]:
@@ -124,12 +125,13 @@ async def create_attempt(
         "user_id": user_id,
     })
 
+    is_solved = is_attempt_solved(score, fb)
+
     stats_result = await _maybe_update_user_stats(
-        uow, user_id, payload.task_id, task.difficulty, score
+        uow, user_id, payload.task_id, task.difficulty, is_solved
     )
 
     stats_out: StatsOut | None = None
-    is_solved = score is not None and score >= 0.99
     coins_rewarded = 0
     if stats_result:
         stats_out, is_solved, coins_rewarded = stats_result
@@ -181,12 +183,13 @@ async def create_attempt_file(
         "user_id": user_id,
     })
 
+    is_solved = is_attempt_solved(None, feedback)
+
     stats_result = await _maybe_update_user_stats(
-        uow, user_id, task_id, task.difficulty, None
+        uow, user_id, task_id, task.difficulty, is_solved
     )
 
     stats_out: StatsOut | None = None
-    is_solved = False
     coins_rewarded = 0
     if stats_result:
         stats_out, is_solved, coins_rewarded = stats_result
