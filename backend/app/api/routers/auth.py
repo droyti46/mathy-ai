@@ -88,18 +88,21 @@ async def me(
 @router.get("/me/stats", response_model=StatsOut)
 async def my_stats(
     login: str | None = None,
-    name: str | None = None,
     user=Depends(get_current_user_opt),
     uow=Depends(get_uow),
 ):
-    db = await _resolve_user(uow, user, login, name)
+    db = await _resolve_user(uow, user, login, None)
     attempts = await uow.attempts.list_by_user(db["id"])
-    solved = sum(1 for a in attempts if (a.get("score") or 0) >= 0.99)
+    solved_by_attempts = sum(1 for a in attempts if (a.get("score") or 0) >= 0.99)
     stats = ensure_user_stats(db.get("stats"))
+
+    attempts_count = max(int(stats.get("attempts", 0)), len(attempts))
+    solved_count = max(int(stats.get("solved_tasks", 0)), solved_by_attempts)
+
     return StatsOut(
-        solved=stats.get("solved_tasks", solved),
-        attempts=len(attempts),
+        solved=solved_count,
+        attempts=attempts_count,
         streak_days=stats.get("streak_days", 0),
         coins=stats.get("coins", 0),
-        solved_task_ids=stats.get("solved_task_ids", []),
+        solved_task_ids=list(stats.get("solved_task_ids", [])),
     )

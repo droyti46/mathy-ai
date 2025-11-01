@@ -30,6 +30,7 @@ async def _ensure_user_columns(conn: AsyncConnection) -> None:
                 "solved_tasks": 0,
                 "solved_task_ids": [],
                 "streak_days": 0,
+                "attempts": 0,
             }
         )
         default_stats_sql_literal = default_stats_json.replace("'", "''")

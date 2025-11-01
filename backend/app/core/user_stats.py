@@ -9,6 +9,7 @@ def default_user_stats() -> Dict[str, object]:
         "solved_tasks": 0,
         "solved_task_ids": [],
         "streak_days": 0,
+        "attempts": 0,
     }
 
 
@@ -25,6 +26,7 @@ def ensure_user_stats(stats: Dict[str, object] | None) -> Dict[str, object]:
     out["solved_tasks"] = int(out.get("solved_tasks", len(out["solved_task_ids"])) or 0)
     out["coins"] = int(out.get("coins", 0) or 0)
     out["streak_days"] = int(out.get("streak_days", 0) or 0)
+    out["attempts"] = int(out.get("attempts", 0) or 0)
     return out
 
 

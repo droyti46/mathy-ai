@@ -1,6 +1,7 @@
 # app/api/routers/attempts.py (фрагменты)
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from app.api.schemas.attempt import AttemptIn, AttemptOut, Feedback, Span
+from app.api.schemas.auth import StatsOut
 from app.core.deps import get_uow, get_llm, get_ocr, get_user_opt
 from datetime import datetime, timezone
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
@@ -48,33 +49,38 @@ async def _maybe_update_user_stats(
     task_id: str,
     task_difficulty: str | None,
     score: float | None,
-    feedback: Feedback,
 ):
     if not user_id:
-        return
+        return None
 
     db_user = await uow.users.get(user_id)
     if not db_user:
-        return
-
-    solved = False
-    if not feedback.spans_detail:
-        solved = True
-    elif score is not None and score >= 0.99:
-        solved = True
-
-    if not solved:
-        return
+        return None
 
     stats = ensure_user_stats(db_user.get("stats"))
-    task_id_str = str(task_id)
-    if task_id_str in stats["solved_task_ids"]:
-        return
+    stats["attempts"] = int(stats.get("attempts", 0)) + 1
 
-    stats["solved_task_ids"].append(task_id_str)
-    stats["solved_tasks"] = len(stats["solved_task_ids"])
-    stats["coins"] = int(stats.get("coins", 0)) + coins_for_difficulty(task_difficulty)
+    task_id_str = str(task_id)
+    solved = score is not None and score >= 0.99
+    coins_rewarded = 0
+
+    if solved and task_id_str not in stats["solved_task_ids"]:
+        stats["solved_task_ids"].append(task_id_str)
+        stats["solved_tasks"] = len(stats["solved_task_ids"])
+        coins_rewarded = coins_for_difficulty(task_difficulty)
+        stats["coins"] = int(stats.get("coins", 0)) + coins_rewarded
+
     await uow.users.update_stats(user_id, stats)
+
+    stats_out = StatsOut(
+        solved=stats.get("solved_tasks", len(stats["solved_task_ids"])),
+        attempts=stats.get("attempts", 0),
+        streak_days=stats.get("streak_days", 0),
+        coins=stats.get("coins", 0),
+        solved_task_ids=list(stats["solved_task_ids"]),
+    )
+
+    return stats_out, solved, coins_rewarded
 
 
 @router.post("", response_model=AttemptOut)
@@ -118,7 +124,15 @@ async def create_attempt(
         "user_id": user_id,
     })
 
-    await _maybe_update_user_stats(uow, user_id, payload.task_id, task.difficulty, score, fb)
+    stats_result = await _maybe_update_user_stats(
+        uow, user_id, payload.task_id, task.difficulty, score
+    )
+
+    stats_out: StatsOut | None = None
+    is_solved = score is not None and score >= 0.99
+    coins_rewarded = 0
+    if stats_result:
+        stats_out, is_solved, coins_rewarded = stats_result
 
     return AttemptOut(
         id=str(attempt_id),
@@ -127,6 +141,9 @@ async def create_attempt(
         feedback=fb,
         score=score,
         created_at=now,
+        is_solved=is_solved,
+        coins_rewarded=coins_rewarded,
+        stats=stats_out,
     )
 
 @router.post("/file", response_model=AttemptOut)
@@ -164,7 +181,15 @@ async def create_attempt_file(
         "user_id": user_id,
     })
 
-    await _maybe_update_user_stats(uow, user_id, task_id, task.difficulty, None, feedback)
+    stats_result = await _maybe_update_user_stats(
+        uow, user_id, task_id, task.difficulty, None
+    )
+
+    stats_out: StatsOut | None = None
+    is_solved = False
+    coins_rewarded = 0
+    if stats_result:
+        stats_out, is_solved, coins_rewarded = stats_result
 
     return AttemptOut(
         id=str(attempt_id),
@@ -173,4 +198,7 @@ async def create_attempt_file(
         feedback=feedback,
         score=None,
         created_at=now,
+        is_solved=is_solved,
+        coins_rewarded=coins_rewarded,
+        stats=stats_out,
     )
