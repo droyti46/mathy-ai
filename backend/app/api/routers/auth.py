@@ -9,8 +9,6 @@ from app.api.schemas.auth import (
     TokenPair,
     UserOut,
     StatsOut,
-    TaskSolvedOut,
-    SolvedCountOut,
 )
 from app.core.deps import get_uow, get_settings
 from app.core.security import hash_password, verify_password, create_token, decode_token, get_current_user_opt
