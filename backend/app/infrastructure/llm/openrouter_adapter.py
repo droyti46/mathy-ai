@@ -73,16 +73,18 @@ class OpenRouterAdapter(ILLM):
     
     async def grade(self, task_md: str, solution_text: str, reference: str = "") -> dict:
         system = (
-            "You are a strict math grader. "
-            "Return ONLY JSON with keys: summary (string), "
-            "spans (list of [start,end] integer pairs pointing to mistakes in the student's solution), "
-            "score (0..1, optional). "
-            "Never reveal the final numeric answer; provide formative feedback."
+            "Ты математический проверяющий. "
+            "Верни ТОЛЬКО JSON с ключами: summary (строка), "
+            "spans (список пар [start, end] целых чисел, указывающих на ошибки в решении студента), "
+            "score (от 0 до 1, необязательный). "
+            "Не раскрывай конечный числовой ответ; дай содержательную обратную связь."
         )
+
         user = (
-            f"Task:\n{task_md}\n\n"
-            f"Student solution (plain text):\n{solution_text}\n\n"
-            f"Reference solution (optional):\n{reference}"
+            f"Задача:\n{task_md}\n\n"
+            f"Решение студента (текст):\n{solution_text}\n\n"
+            f"Эталонное решение (необязательно):\n{reference}\n\n"
+            "Отметь только действительно значимые ошибки — неверные шаги рассуждений, пропущенные случаи или неверные формулы."
         )
 
         # выберем модель для градинга: LLM_MODEL_GRADE если есть, иначе LLM_MODEL_CHECK
