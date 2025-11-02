@@ -7,7 +7,12 @@ router = APIRouter(prefix="/tasks", tags=["hints"])
 GUARD_PHRASES = ["полное решение", "дай ответ", "скажи ответ", "реши полностью", "final answer"]
 
 @router.post("/{task_id}/hint", response_model=HintOut)
-async def request_hint(task_id: str, payload: HintRequest, uow = Depends(get_uow), llm = Depends(get_llm)):
+async def request_hint(
+    task_id: str,
+    payload: HintRequest,
+    uow = Depends(get_uow),
+    llm = Depends(get_llm),
+):
     task = await uow.tasks.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

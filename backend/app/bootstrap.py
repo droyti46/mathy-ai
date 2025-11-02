@@ -5,6 +5,7 @@ from app.infrastructure.db.base import create_engine_and_session, init_models
 from app.infrastructure.db.uow_sqlalchemy import SqlUoW
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
 from app.infrastructure.storage.local import LocalStorage
+from app.infrastructure.prompts.text_store import PromptTextStore
 
 def build_container():
     s = get_settings()
@@ -20,7 +21,8 @@ def build_container():
         trust_env=True,                           # или False, если хочешь игнорировать системные proxy
     )
     storage = LocalStorage(base_dir=s.STORAGE_DIR)
-    return dict(settings=s, uow=uow, llm=llm, ocr=ocr, storage=storage, engine=engine)
+    prompts = PromptTextStore('app/infrastructure/prompts')
+    return dict(settings=s, uow=uow, llm=llm, ocr=ocr, storage=storage, engine=engine, prompts=prompts)
  
 async def init_db(engine):
     await init_models(engine)
