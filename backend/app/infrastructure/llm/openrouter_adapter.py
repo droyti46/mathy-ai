@@ -59,10 +59,11 @@ class OpenRouterAdapter(ILLM):
         messages = self.prompts.build(
             "assistant",
             chat_history=chat_history,
+            vars={'task': task},
             wrap_user=[0],
             user_var="input"
         )
-        print(messages)
+        #print(messages)
         return await self._chat(messages, model=self.s.LLM_MODEL_HINT)
 
     async def solve(self, task: str) -> str:
