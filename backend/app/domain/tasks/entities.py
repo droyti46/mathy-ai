@@ -10,3 +10,6 @@ class Task:
     reference_solution_md: str | None = None
     source: str | None = None
     tags: list[str] = None
+    lesson_id: str | None = None
+    theme_title: str | None = None
+    lesson_title: str | None = None

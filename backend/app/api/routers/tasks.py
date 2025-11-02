@@ -7,6 +7,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 @router.get("", response_model=list[TaskOut])
 async def list_tasks(theme_id: Optional[str] = None,
+                     lesson_id: Optional[str] = None,
                      difficulty: Optional[str] = Query(default=None),
                      tags: Optional[str] = None,
                      q: Optional[str] = None,
@@ -16,7 +17,8 @@ async def list_tasks(theme_id: Optional[str] = None,
                      limit: int = 50, offset: int = 0,
                      uow = Depends(get_uow),
                      user = Depends(get_user_opt)):
-    tasks = await uow.tasks.list(theme_id=theme_id, difficulty=difficulty, tags=tags, q=q,
+    tasks = await uow.tasks.list(theme_id=theme_id, lesson_id=lesson_id,
+                                 difficulty=difficulty, tags=tags, q=q,
                                  sort_by=sort_by, seed=seed, limit=limit, offset=offset,
                                  exclude_solved_by_user_id=(user["user_id"] if user and exclude_solved else None),
                                  attempts_repo=uow.attempts)
