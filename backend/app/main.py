@@ -16,7 +16,7 @@ if __package__ in {None, ""}:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import attempts, auth, hints, solve, tasks, themes
+from app.api.routers import attempts, auth, assistant, solve, tasks, themes
 from app.bootstrap import build_container, init_db
 from app.core.errors import register_handlers
 from app.core.logging import setup_logging
@@ -44,10 +44,10 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(themes.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(attempts.router, prefix="/api")
-app.include_router(hints.router, prefix="/api")
+app.include_router(assistant.router, prefix="/api")
 app.include_router(solve.router, prefix="/api")
 
-@app.get("/")
+@app.get("/", tags=["system"])
 async def health():
     return {"title": "Мати AI API", "docs": "/docs", "status": "ok"}
 
