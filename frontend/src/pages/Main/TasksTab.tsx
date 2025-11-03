@@ -47,6 +47,7 @@ export default function TasksTab() {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [totalTasksAll, setTotalTasksAll] = useState(0);
   const [solvedAll, setSolvedAll] = useState<number>(0);
+  const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
 
   // мультивыбор
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
@@ -86,8 +87,9 @@ export default function TasksTab() {
       setThemes(tRes.data);
       setTotalTasksAll(tRes.data.reduce((s, t) => s + (t.tasks_count ?? 0), 0));
       try {
-        const { data } = await api.get<{ solved: number }>('/api/auth/me/stats');
+        const { data } = await api.get<{ solved: number, solved_task_ids?: string[] }>('/api/auth/me/stats');
         setSolvedAll(data.solved);
+        setSolvedIds(new Set(data.solved_task_ids ?? []));
       } catch {}
     })();
   }, []);
@@ -235,7 +237,7 @@ export default function TasksTab() {
       {/* Список задач */}
       <div className="mt-8 space-y-4">
         {tasks.map((t, i) => (
-          <TaskRow key={t.id} task={t} even={i % 2 === 1} onClick={() => nav(`/task/${t.id}`)} />
+          <TaskRow key={t.id} task={t} even={i % 2 === 1} solved={solvedIds.has(t.id)} onClick={() => nav(`/task/${t.id}`)} />
         ))}
         {loading && <div className="text-center py-6 opacity-90">Загрузка…</div>}
         <div ref={sentinelRef} className="h-2" />
@@ -297,17 +299,29 @@ function LevelChip({
   );
 }
 
-function TaskRow({ task, even, onClick }: { task: Task; even: boolean; onClick: () => void }) {
+function TaskRow({
+  task, even, solved = false, onClick
+}: { task: Task; even: boolean; solved?: boolean; onClick: () => void }) {
   const icon = ICON_BY_THEME_ID[task.theme_id];
+
+  const className =
+    'cursor-pointer rounded-xl2 flex items-center justify-between px-6 py-4 ' +
+    (solved
+      ? 'bg-primary-200 text-neutral-700'        // ← серый фон для решённых
+      : (even ? 'bg-white text-neutral-900'
+              : 'bg-white text-neutral-900'));
+
   return (
-    <div
-      onClick={onClick}
-      className={
-        'cursor-pointer rounded-xl2 bg-white text-neutral-900 flex items-center justify-between px-6 py-4 ' +
-        (even ? 'bg-primary-200/40' : '')
-      }
-    >
-      <div className="pr-4 max-w-[60%]">
+    <div onClick={onClick} className={className}>
+      <div className="pr-4 max-w-[60%] flex items-start gap-3">
+        {solved && (
+          <span
+            aria-label="Решено"
+            className="mt-1 inline-flex items-center justify-center w-6 h-6 text-black text-[124x]"
+          >
+            ✓
+          </span>
+        )}
         <div className="opacity-90">
           <b>{task.name}</b>
           <div className="mt-1 md-snippet">
@@ -315,6 +329,7 @@ function TaskRow({ task, even, onClick }: { task: Task; even: boolean; onClick: 
           </div>
         </div>
       </div>
+
       <div className="flex items-center gap-8">
         <div className="text-primary-900 text-xl">{starsByDifficulty(task.difficulty)}</div>
         <div className="flex items-center gap-3 text-right">
