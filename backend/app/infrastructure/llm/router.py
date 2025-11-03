@@ -26,6 +26,16 @@ class LLMRouter(ILLM):
             return await self.adapter.hint(task, chat_history)
         raise NotImplementedError("Adapter.hint is missing")
 
+    async def init_teacher_mode(self, task) -> str:
+        if hasattr(self.adapter, "init_teacher_mode"):
+            return await self.adapter.init_teacher_mode(task)
+        raise NotImplementedError("Adapter.init_teacher_mode is missing")
+    
+    async def teacher_message(self, task: str, chat_history: Sequence[Dict[str, str]]) -> str:
+        if hasattr(self.adapter, "teacher_message"):
+            return await self.adapter.teacher_message(task, chat_history)
+        raise NotImplementedError("Adapter.teacher_message is missing")
+    
     async def solve(self, task_md: str):
         if self.mock:
             return {

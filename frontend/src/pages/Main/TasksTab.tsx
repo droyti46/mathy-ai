@@ -227,7 +227,7 @@ export default function TasksTab() {
             />
           </div>
           <div className="text-right whitespace-nowrap opacity-95">
-            <span className="font-semibold">{xSolved}</span>/<span className="opacity-90">{yTotal}</span> Решено
+            <span className="font-semibold">{xSolved}</span>/<span className="opacity-90">{totalTasksAll}</span> Решено
           </div>
         </div>
       </div>

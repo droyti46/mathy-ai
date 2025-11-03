@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
 from app.api.schemas.auth import StatsOut
+from app.api.schemas.chat import ChatOut
 
 class Span(BaseModel):
     start: int
@@ -32,6 +33,13 @@ class AttemptOut(BaseModel):
     solution_text: str = ""
     feedback: Feedback
     created_at: str
+    is_solved: bool = False
+    coins_rewarded: int = 0
+    stats: Optional[StatsOut] = None
+
+class TeacherAttemptOut(BaseModel):
+    task_id: str
+    messages: ChatOut
     is_solved: bool = False
     coins_rewarded: int = 0
     stats: Optional[StatsOut] = None

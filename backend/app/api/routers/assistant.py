@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.deps import get_uow, get_llm
-from app.api.schemas.chat import HintRequest, ChatOut, ChatMessage
+from app.api.schemas.chat import ChatRequest, ChatOut, ChatMessage
 
 router = APIRouter(prefix="/tasks", tags=["assistant"])
 
 @router.post("/{task_id}/assistant", response_model=ChatOut)
 async def request_hint(
     task_id: str,
-    payload: HintRequest,
+    payload: ChatRequest,
     uow = Depends(get_uow),
     llm = Depends(get_llm),
 ):

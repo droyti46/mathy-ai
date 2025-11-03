@@ -6,7 +6,7 @@ from app.core.deps import get_uow, get_llm, get_ocr, get_user_opt
 from datetime import datetime, timezone
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
 from app.application.markers import postprocess_marked_text
-from app.core.user_stats import coins_for_difficulty, ensure_user_stats
+from app.core.user_stats import maybe_update_user_stats
 from app.core.attempts import is_attempt_solved
 
 def _now_iso() -> str:
@@ -54,46 +54,6 @@ async def _resolve_user_id(uow, user: dict | None, login: str | None) -> str | N
 
     return None
 
-async def _maybe_update_user_stats(
-    uow,
-    user_id: str | None,
-    task_id: str,
-    task_difficulty: str | None,
-    is_solved_attempt: bool,
-):
-    if not user_id:
-        return None
-
-    db_user = await uow.users.get(user_id)
-    if not db_user:
-        return None
-
-    stats = ensure_user_stats(db_user.get("stats"))
-    stats["attempts"] = int(stats.get("attempts", 0)) + 1
-
-    task_id_str = str(task_id)
-    solved = bool(is_solved_attempt)
-    coins_rewarded = 0
-
-    if solved and task_id_str not in stats["solved_task_ids"]:
-        stats["solved_task_ids"].append(task_id_str)
-        stats["solved_tasks"] = len(stats["solved_task_ids"])
-        coins_rewarded = coins_for_difficulty(task_difficulty)
-        stats["coins"] = int(stats.get("coins", 0)) + coins_rewarded
-
-    await uow.users.update_stats(user_id, stats)
-
-    stats_out = StatsOut(
-        solved=stats.get("solved_tasks", len(stats["solved_task_ids"])),
-        attempts=stats.get("attempts", 0),
-        streak_days=stats.get("streak_days", 0),
-        coins=stats.get("coins", 0),
-        solved_task_ids=list(stats["solved_task_ids"]),
-    )
-
-    return stats_out, solved, coins_rewarded
-
-
 @router.post("", response_model=AttemptOut)
 async def create_attempt(
     payload: AttemptIn,
@@ -129,7 +89,7 @@ async def create_attempt(
 
     is_solved = is_attempt_solved(feedback)
 
-    stats_result = await _maybe_update_user_stats(
+    stats_result = await maybe_update_user_stats(
         uow, user_id, payload.task_id, task.difficulty, is_solved
     )
 
@@ -188,7 +148,7 @@ async def create_attempt_file(
 
     is_solved = is_attempt_solved(feedback)
 
-    stats_result = await _maybe_update_user_stats(
+    stats_result = await maybe_update_user_stats(
         uow, user_id, task_id, task.difficulty, is_solved
     )
 

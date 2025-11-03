@@ -57,6 +57,25 @@ class OpenRouterAdapter(ILLM):
             user_var="input"
         )
         return await self._chat(messages, model=self.s.LLM_MODEL_ASSISTANT)
+    
+    async def init_teacher_mode(self, task: str) -> str:
+        '''Инициализирует режим преподавания'''
+        messages = self.prompts.build(
+            "teacher",
+            vars={'task': task}
+        )
+
+        return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)
+    
+    async def teacher_message(self, task: str, chat_history: Sequence[Dict[str, str]]) -> str:
+        messages = self.prompts.build(
+            "teacher",
+            chat_history=chat_history,
+            vars={"task": task},
+            wrap_user=[0],
+        )
+        print(messages)
+        return await self._chat(messages, model=self.s.LLM_MODEL_ASSISTANT)
 
     async def solve(self, task: str) -> str:
         """Решает задание"""

@@ -16,7 +16,7 @@ if __package__ in {None, ""}:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import submit, auth, assistant, solve, tasks, themes
+from app.api.routers import submit, auth, assistant, solve, tasks, themes, teacher
 from app.bootstrap import build_container, init_db
 from app.core.errors import register_handlers
 from app.core.logging import setup_logging
@@ -46,6 +46,7 @@ app.include_router(tasks.router, prefix="/api")
 app.include_router(submit.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(solve.router, prefix="/api")
+app.include_router(teacher.router, prefix="/api")
 
 @app.get("/", tags=["system"])
 async def health():

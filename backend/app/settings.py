@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str = Field(..., min_length=1)
     OPENROUTER_BASE_URL: str = Field(default="https://openrouter.ai/api/v1")
     LLM_MODEL_CHECK: str = Field(default="google/gemini-2.5-flash")
-    LLM_MODEL_HINT: str = Field(default="google/gemini-2.5-flash")
+    LLM_MODEL_ASSISTANT: str = Field(default="google/gemini-2.5-flash")
     LLM_MODEL_SOLVE: str = Field(default="google/gemini-2.5-flash")
     LLM_MODEL_VISION: str = Field(default="google/gemini-2.5-flash")
     OCR_MODEL: str = Field(default="google/gemini-2.5-flash")
