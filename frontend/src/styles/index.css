@@ -25,3 +25,10 @@ body { @apply font-sans text-neutral-900; }
   opacity: .8;
   will-change: transform;
 }
+
+.md-snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;      /* столько строк хотим показать */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

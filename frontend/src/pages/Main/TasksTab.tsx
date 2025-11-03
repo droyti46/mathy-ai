@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api/axios';
+import Markdown from '@/components/Markdown';
 
 import icon1 from '@/assets/images/icon-math-analysis.png';
 import icon2 from '@/assets/images/icon-linear-geometry.png';
@@ -305,15 +306,18 @@ function TaskRow({ task, even, onClick }: { task: Task; even: boolean; onClick: 
         (even ? 'bg-primary-200/40' : '')
       }
     >
-      <div className="pr-4">
+      <div className="pr-4 max-w-[60%]">
         <div className="opacity-90">
-          <b>{task.name}</b>{' — '}{snippet(task.statement_md, 160)}
+          <b>{task.name}</b>
+          <div className="mt-1 md-snippet">
+            <Markdown>{task.statement_md}</Markdown>
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-8">
         <div className="text-primary-900 text-xl">{starsByDifficulty(task.difficulty)}</div>
         <div className="flex items-center gap-3 text-right">
-          {icon && <img src={icon} alt="" className="w-9 h-9 object-contain" />}
+          {icon && <img src={icon} alt="" className="w-[100px] object-contain" />}
           <div className="text-sm opacity-80">{task.theme_id}</div>
         </div>
       </div>

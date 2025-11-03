@@ -10,7 +10,7 @@ type AuthState = {
   refreshToken: string | null;
   hydrate: () => void;
   setTokens: (a: string, r: string) => void;
-  setUser: (u: User | null) => void;            // ← добавлено
+  setUser: (u: User | null) => void;
   logout: () => void;
   registerAndLogin: (login: string, password: string, name?: string) => Promise<void>;
   login: (login: string, password: string) => Promise<void>;
