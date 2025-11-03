@@ -70,7 +70,7 @@ async def create_attempt(
 
     attempt_id = await uow.attempts.save({
         "task_id": payload.task_id,
-        "solution_text": stitched_solution,
+        "solution_text": payload.text,
         "feedback": feedback.model_dump(),
         "created_at": now,
         "user_id": user_id,
@@ -90,7 +90,7 @@ async def create_attempt(
     return AttemptOut(
         id=str(attempt_id),
         task_id=payload.task_id,
-        solution_text=stitched_solution,
+        solution_text=payload.text,
         feedback=feedback,
         created_at=now,
         is_solved=is_solved,
@@ -98,61 +98,11 @@ async def create_attempt(
         stats=stats_out,
     )
 
-@router.post("/file", response_model=AttemptOut)
-async def create_attempt_file(
-    task_id: str,
-    login: str | None = Form(None),
+@router.post("/extract_text_from_file", response_model=str)
+async def extract_text(
     file: UploadFile = File(...),
-    uow = Depends(get_uow),
     ocr: VisionOCROpenRouter = Depends(get_ocr),
-    llm = Depends(get_llm),
-    user = Depends(get_user_opt),
 ):
-    # 1) проверка задачи
-    task = await uow.tasks.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    # 2) OCR → text → LLM разметка
+    # OCR
     text = await ocr.extract_text(file)
-    marked = await llm.check_solution(task.statement_md, text)
-    stitched_solution, marker_spans, marker_msgs = postprocess_marked_text(text, marked)
-
-    spans_detail = [
-        Span(start=s, end=e, message=(marker_msgs[i] if i < len(marker_msgs) else ""), severity="error")
-        for i, (s, e) in enumerate(marker_spans)
-    ]
-    feedback = Feedback(summary="", spans=marker_spans, spans_detail=spans_detail)
-
-    now = _now_iso()
-    user_id = await resolve_user_id(uow, user, login)
-
-    attempt_id = await uow.attempts.save({
-        "task_id": task_id,
-        "solution_text": stitched_solution,
-        "feedback": feedback.model_dump(),
-        "created_at": now,
-        "user_id": user_id,
-    })
-
-    is_solved = is_attempt_solved(feedback)
-
-    stats_result = await maybe_update_user_stats(
-        uow, user_id, task_id, task.difficulty, is_solved
-    )
-
-    stats_out: StatsOut | None = None
-    coins_rewarded = 0
-    if stats_result:
-        stats_out, is_solved, coins_rewarded = stats_result
-
-    return AttemptOut(
-        id=str(attempt_id),
-        task_id=task_id,
-        solution_text=stitched_solution,
-        feedback=feedback,
-        created_at=now,
-        is_solved=is_solved,
-        coins_rewarded=coins_rewarded,
-        stats=stats_out,
-    )
+    return text
