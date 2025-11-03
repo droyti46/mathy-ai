@@ -20,7 +20,6 @@ def _build_feedback(raw_result: dict) -> Feedback:
     - feedback.spans => [[start,end], ...] (используются только внутри бэкенда)
     - feedback.spans_detail => List[Span]
     """
-    summary = raw_result.get("summary", "")
 
     raw_spans = raw_result.get("spans", []) or []
     spans_detail: list[Span] = []
@@ -42,7 +41,7 @@ def _build_feedback(raw_result: dict) -> Feedback:
             spans_detail.append(Span(start=start, end=end, message=msg, severity=sev))
             spans_pairs.append([start, end])
 
-    return Feedback(summary=summary, spans=spans_pairs, spans_detail=spans_detail)
+    return Feedback(spans=spans_pairs, spans_detail=spans_detail)
 
 async def _resolve_user_id(uow, user: dict | None, login: str | None) -> str | None:
     if user and user.get("user_id"):
@@ -115,24 +114,20 @@ async def create_attempt(
         Span(start=s, end=e, message=(marker_msgs[i] if i < len(marker_msgs) else ""), severity="error")
         for i, (s, e) in enumerate(marker_spans)
     ]
-    feedback = Feedback(summary="", spans=marker_spans, spans_detail=spans_detail)
-    score = None
+    feedback = Feedback(spans=marker_spans, spans_detail=spans_detail)
 
     now = _now_iso()
     user_id = await _resolve_user_id(uow, user, payload.login)
 
     attempt_id = await uow.attempts.save({
         "task_id": payload.task_id,
-        "mode": payload.mode,
-        "solution_text": stitched_solution,   # сохраняем размеченный текст
+        "solution_text": stitched_solution,
         "feedback": feedback.model_dump(),
-        "score": score,
-        "time_spent_sec": payload.time_spent_sec,
         "created_at": now,
         "user_id": user_id,
     })
 
-    is_solved = is_attempt_solved(score, feedback)
+    is_solved = is_attempt_solved(feedback)
 
     stats_result = await _maybe_update_user_stats(
         uow, user_id, payload.task_id, task.difficulty, is_solved
@@ -148,7 +143,6 @@ async def create_attempt(
         task_id=payload.task_id,
         solution_text=stitched_solution,
         feedback=feedback,
-        score=score,
         created_at=now,
         is_solved=is_solved,
         coins_rewarded=coins_rewarded,
@@ -186,15 +180,13 @@ async def create_attempt_file(
 
     attempt_id = await uow.attempts.save({
         "task_id": task_id,
-        "mode": "solve",
         "solution_text": stitched_solution,
         "feedback": feedback.model_dump(),
-        "score": None,
         "created_at": now,
         "user_id": user_id,
     })
 
-    is_solved = is_attempt_solved(None, feedback)
+    is_solved = is_attempt_solved(feedback)
 
     stats_result = await _maybe_update_user_stats(
         uow, user_id, task_id, task.difficulty, is_solved
@@ -210,7 +202,6 @@ async def create_attempt_file(
         task_id=task_id,
         solution_text=stitched_solution,
         feedback=feedback,
-        score=None,
         created_at=now,
         is_solved=is_solved,
         coins_rewarded=coins_rewarded,
