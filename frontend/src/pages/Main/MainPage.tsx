@@ -10,21 +10,26 @@ export default function MainPage() {
   const [coins, setCoins] = useState<number>(0);
 
   useEffect(() => {
-    const load = async () => {
+    let cancelled = false;
+
+    (async () => {
       try {
-        const [me, stats] = await Promise.all([
-          api.get('/api/auth/me'),
-          api.get('/api/auth/me/stats'),
-        ]);
+        // 1) сначала получаем пользователя
+        const me = await api.get('/api/auth/me');
+        if (cancelled) return;
         setUser(me.data);
-        setCoins(stats.data.coins ?? 0);
+
+        // 2) затем — статы (к этому моменту всё уже инициализировано)
+        const stats = await api.get('/api/auth/me/stats');
+        if (cancelled) return;
+        setCoins(stats.data?.coins ?? 0);
       } catch {
         // можно оставить 0
       }
-    };
-    // грузим при первом маунте или если user ещё не известен
-    if (!user) load();
-  }, [user, setUser]);
+    })();
+
+    return () => { cancelled = true; };
+  }, [setUser]); // зависит только от setUser, чтобы эффект не дергался лишний раз
 
   return (
     <div className="min-h-screen bg-primary-500/90">
