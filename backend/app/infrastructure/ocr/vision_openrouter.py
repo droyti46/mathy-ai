@@ -34,7 +34,11 @@ class VisionOCROpenRouter:
             raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY не задан")
 
         content_type = (file.content_type or "").lower()
+        filename = file.filename or ""
         raw = await file.read()
+
+        if content_type.startswith("text/") or self._is_text_extension(filename):
+            return self._decode_text(raw, content_type or filename)
 
         if content_type.startswith("image/"):
             return await self._ocr_image_bytes(raw, mime=content_type)
@@ -137,3 +141,15 @@ class VisionOCROpenRouter:
     @staticmethod
     def _to_data_url(b: bytes, mime: str) -> str:
         return f"data:{mime};base64," + base64.b64encode(b).decode("ascii")
+
+    @staticmethod
+    def _is_text_extension(filename: str) -> bool:
+        _, ext = os.path.splitext(filename.lower())
+        return ext in {".txt", ".md", ".markdown", ".text"}
+
+    @staticmethod
+    def _decode_text(raw: bytes, source: str) -> str:
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=415, detail=f"Не удалось прочитать текстовый файл ({source}). Ожидается UTF-8") from exc

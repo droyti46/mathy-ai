@@ -4,8 +4,9 @@ import json
 import anyio
 from typing import Sequence, Dict, Any
 from openai import OpenAI
+from app.infrastructure.prompts.text_store import PromptTextStore
 from app.application.interfaces.llm import ILLM
-from app.settings import Settings
+from app.settings import Settings 
 import re
 
 def _safe_json(s: str) -> Dict[str, Any]:
@@ -22,6 +23,7 @@ class OpenRouterAdapter(ILLM):
             api_key=self.s.OPENROUTER_API_KEY,
             default_headers={"HTTP-Referer": "http://localhost:8000", "X-Title": self.s.APP_NAME},
         )
+        self.prompts = PromptTextStore(base_dir="app/infrastructure/prompts")
 
     async def _chat(self, messages, model: str, response_format: Dict[str, Any] | None = None) -> str:
         def _do():
@@ -47,13 +49,13 @@ class OpenRouterAdapter(ILLM):
         return _safe_json(out)
 
     async def hint(self, task: str, chat_history: Sequence[Dict[str, str]]) -> str:
-        system = (
-            "You are a vigilant math tutor. Analyse the student's reasoning, point out where the mistake occurs, "
-            "and suggest how to fix the approach. Under no circumstances provide the correct final answer or a full solution."
+        messages = self.prompts.build(
+            "assistant",
+            chat_history=chat_history,
+            vars={'task': task},
+            wrap_user=[0],
+            user_var="input"
         )
-        messages = [{"role": "system", "content": system}]
-        messages += [{"role": m["role"], "content": m["content"]} for m in chat_history]
-        messages.append({"role": "user", "content": f"Task context:\n{task}"})
         return await self._chat(messages, model=self.s.LLM_MODEL_HINT)
 
     async def solve(self, task: str) -> str:

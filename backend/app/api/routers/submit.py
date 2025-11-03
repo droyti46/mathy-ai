@@ -12,7 +12,7 @@ from app.core.attempts import is_attempt_solved
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-router = APIRouter(prefix="/attempts", tags=["attempts"])
+router = APIRouter(prefix="/submit", tags=["submit"])
 
 def _build_feedback(raw_result: dict) -> Feedback:
     """

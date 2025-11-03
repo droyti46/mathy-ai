@@ -21,35 +21,10 @@ class LLMRouter(ILLM):
         self.settings = settings
         self.mock = bool(getattr(settings, "MOCK_LLM", False))
 
-    async def hint_from_text(self, statement_md: str, student_text: str, level: int = 1) -> str:
-        level_msg = {
-            1: "Сделай мягкую наводку на место ошибки и следующий шаг.",
-            2: "Укажи конкретное место ошибки и подскажи правило/формулу, но не выводи финальный результат.",
-            3: "Расскажи почти весь путь решения и подчеркни ошибку, однако не подставляй финальные числа или выражения.",
-        }[level if level in (1, 2, 3) else 1]
-
-        system_prompt = (
-            "Ты математический наставник. Найди, где в решении ученика ошибка, "
-            "и объясни, как скорректировать ход мыслей. Ни в коем случае не выдавай правильный ответ."
-        )
-
-        user_prompt = (
-            f"УСЛОВИЕ:\n{statement_md}\n\n"
-            f"РЕШЕНИЕ УЧЕНИКА:\n{student_text}\n\n"
-            f"{level_msg}"
-        )
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        return await self._chat_text(messages=messages, model=self.settings.LLM_MODEL_HINT, temperature=0)
-
     async def hint(self, task: str, chat_history: Sequence[Dict[str, str]]) -> str:
         if hasattr(self.adapter, "hint"):
             return await self.adapter.hint(task, chat_history)
         raise NotImplementedError("Adapter.hint is missing")
-
 
     async def solve(self, task_md: str):
         if self.mock:

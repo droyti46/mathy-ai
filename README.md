@@ -46,7 +46,7 @@ git clone https://github.com/droyti46/mathy-ai.git
 2. Установите зависимости
   ```bash
   npm install
-  ``
+  ```
 
 3. Скопируйте .env.example
   ```bash
