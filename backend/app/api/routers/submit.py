@@ -6,7 +6,7 @@ from app.core.deps import get_uow, get_llm, get_ocr, get_user_opt
 from datetime import datetime, timezone
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
 from app.application.markers import postprocess_marked_text
-from app.core.user_stats import maybe_update_user_stats
+from app.core.user_stats import maybe_update_user_stats, resolve_user_id
 from app.core.attempts import is_attempt_solved
 
 def _now_iso() -> str:
@@ -43,17 +43,6 @@ def _build_feedback(raw_result: dict) -> Feedback:
 
     return Feedback(spans=spans_pairs, spans_detail=spans_detail)
 
-async def _resolve_user_id(uow, user: dict | None, login: str | None) -> str | None:
-    if user and user.get("user_id"):
-        return user.get("user_id")
-
-    if login:
-        db_user = await uow.users.get_by_login(login)
-        if db_user:
-            return db_user.get("id")
-
-    return None
-
 @router.post("", response_model=AttemptOut)
 async def create_attempt(
     payload: AttemptIn,
@@ -77,7 +66,7 @@ async def create_attempt(
     feedback = Feedback(spans=marker_spans, spans_detail=spans_detail)
 
     now = _now_iso()
-    user_id = await _resolve_user_id(uow, user, payload.login)
+    user_id = await resolve_user_id(uow, user, payload.login)
 
     attempt_id = await uow.attempts.save({
         "task_id": payload.task_id,
@@ -136,7 +125,7 @@ async def create_attempt_file(
     feedback = Feedback(summary="", spans=marker_spans, spans_detail=spans_detail)
 
     now = _now_iso()
-    user_id = await _resolve_user_id(uow, user, login)
+    user_id = await resolve_user_id(uow, user, login)
 
     attempt_id = await uow.attempts.save({
         "task_id": task_id,

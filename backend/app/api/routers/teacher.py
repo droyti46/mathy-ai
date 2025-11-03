@@ -1,8 +1,10 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.deps import get_uow, get_llm, get_user_opt
 from app.api.schemas.chat import ChatRequest, ChatOut, ChatMessage
 from app.api.schemas.attempt import TeacherAttemptOut
-from app.core.user_stats import maybe_update_user_stats
+from app.core.user_stats import maybe_update_user_stats, resolve_user_id
 
 router = APIRouter(prefix="/tasks", tags=["teacher"])
 
@@ -18,6 +20,7 @@ async def init_teacher_mode(task_id: str, uow = Depends(get_uow), llm = Depends(
 async def teacher_message(
     task_id: str,
     payload: ChatRequest,
+    login: Optional[str] = None,
     llm = Depends(get_llm),
     uow = Depends(get_uow),
     user = Depends(get_user_opt),
@@ -27,14 +30,14 @@ async def teacher_message(
         raise HTTPException(status_code=404, detail="Task not found")
     text = await llm.teacher_message(task, [{"role": "user", "content": ""}] + [m.model_dump() for m in payload.messages])
 
-    user_id = user.get("user_id")
+    user_id = await resolve_user_id(uow, user, login)
 
     # Проверка на то, что задача решена
     is_solved = 'задача решена' in text.lower()
 
     # Получаем статистику пользователя
     stats_result = await maybe_update_user_stats(
-        uow, user_id, payload.task_id, task.difficulty, is_solved
+        uow, user_id, task_id, task.difficulty, is_solved
     )
     stats_out, is_solved, coins_rewarded = stats_result
 

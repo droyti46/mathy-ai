@@ -74,7 +74,6 @@ class OpenRouterAdapter(ILLM):
             vars={"task": task},
             wrap_user=[0],
         )
-        print(messages)
         return await self._chat(messages, model=self.s.LLM_MODEL_ASSISTANT)
 
     async def solve(self, task: str) -> str:

@@ -46,6 +46,16 @@ def coins_for_difficulty(difficulty: str | None) -> int:
         return 5
     return mapping.get(str(difficulty).strip().lower(), 5)
 
+async def resolve_user_id(uow, user: dict | None, login: str | None) -> str | None:
+    if user and user.get("user_id"):
+        return user.get("user_id")
+
+    if login:
+        db_user = await uow.users.get_by_login(login)
+        if db_user:
+            return db_user.get("id")
+
+    return None
 
 async def maybe_update_user_stats(
     uow,
