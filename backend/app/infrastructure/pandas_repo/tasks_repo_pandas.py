@@ -355,18 +355,65 @@ class PandasTaskRepo:
         offset: int = 0,
         exclude_solved_by_user_id: str | None = None,
         attempts_repo=None,
+
+        # НОВОЕ:
+        theme_ids: list[str] | None = None,
+        difficulty_in: list[str] | None = None,
     ):
         df = self.df
 
-        theme_key = self._resolve_theme_key(theme_id)
-        if theme_key:
-            theme_slug = self._theme_idx_to_slug.get(theme_key)
-            df = df[df["_theme_slug"] == theme_slug]
-        elif theme_id:
-            df = df[df["theme_id"].astype(str) == str(theme_id)]
+        # ---- ТЕМЫ: OR-фильтр по нескольким значениям ----
+        if theme_ids:
+            allowed_slugs: set[str] = set()
+            allowed_raws: set[str] = set()
+            for tid in theme_ids:
+                key = self._resolve_theme_key(tid)
+                if key:
+                    slug = self._theme_idx_to_slug.get(key)
+                    if slug:
+                        allowed_slugs.add(slug)
+                else:
+                    # если не распознали как slug/индекс — попробуем сравнить с исходной колонкой theme_id
+                    allowed_raws.add(str(tid))
+            mask = None
+            if allowed_slugs:
+                mask = df["_theme_slug"].isin(list(allowed_slugs))
+            if allowed_raws:
+                raw_mask = df["theme_id"].astype(str).isin(list(allowed_raws))
+                mask = raw_mask if mask is None else (mask | raw_mask)
+            if mask is not None:
+                df = df[mask]
+        else:
+            # старый одиночный фильтр (как было)
+            theme_key = self._resolve_theme_key(theme_id)
+            if theme_key:
+                theme_slug = self._theme_idx_to_slug.get(theme_key)
+                df = df[df["_theme_slug"] == theme_slug]
+            elif theme_id:
+                df = df[df["theme_id"].astype(str) == str(theme_id)]
 
+        # ---- УРОВНИ СЛОЖНОСТИ: OR-фильтр по нескольким ----
+        if difficulty_in:
+            norm = set()
+            for d in difficulty_in:
+                s = str(d).strip().lower()
+                if s in ("легкий", "лёгкий", "easy", "простой"):
+                    norm.add("easy")
+                elif s in ("средний", "medium", "нормальный"):
+                    norm.add("medium")
+                elif s in ("сложный", "hard", "тяжелый", "тяжёлый"):
+                    norm.add("hard")
+            if norm:
+                df = df[df["difficulty"].astype(str).isin(list(norm))]
+        elif difficulty:
+            df = df[df["difficulty"].astype(str) == str(difficulty)]
+
+        # ---- остальное как было ----
         if lesson_id:
             lesson_filtered = False
+            # если выше был выбран конкретный theme_key — логика как раньше;
+            # при множественных темах сюда обычно не попадём с lesson_id.
+            theme_key = self._resolve_theme_key(theme_id) if (theme_id and not theme_ids) else None
             if theme_key:
                 lesson_key = self._resolve_lesson_key(theme_key, lesson_id)
                 lesson_filtered = True
@@ -381,8 +428,6 @@ class PandasTaskRepo:
             if not lesson_filtered:
                 df = df[df["_lesson_slug"] == str(lesson_id)]
 
-        if difficulty:
-            df = df[df["difficulty"].astype(str) == str(difficulty)]
         if tags:
             tagset = {t.strip().lower() for t in tags.split(",") if t.strip()}
             if tagset:
@@ -391,6 +436,7 @@ class PandasTaskRepo:
                         lambda x: tagset.issubset({t.strip() for t in str(x).split(",") if t.strip()})
                     )
                 ]
+
         if q:
             ql = q.lower()
             df = df[df["statement_md"].str.lower().str.contains(ql, na=False)]
@@ -408,9 +454,7 @@ class PandasTaskRepo:
             order = {"easy": 0, "medium": 1, "hard": 2}
             df = df.sort_values(by="difficulty", key=lambda s: s.map(lambda x: order.get(str(x), 1)))
 
-        out = []
-        for _, r in df.iloc[offset : offset + limit].iterrows():
-            out.append(self._row_to_task(r))
+        out = [self._row_to_task(r) for _, r in df.iloc[offset : offset + limit].iterrows()]
         return out
 
     async def list_themes(self):

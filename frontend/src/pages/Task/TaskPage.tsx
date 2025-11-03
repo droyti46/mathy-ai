@@ -1,9 +1,12 @@
-import { useSearchParams } from 'react-router-dom';
-import SolveLayout from './SolveMode/SolveLayout';
-import TeachLayout from './TeachMode/TeachLayout';
+import { useParams, Link } from 'react-router-dom';
 
 export default function TaskPage() {
-  const [sp] = useSearchParams();
-  const mode = sp.get('mode') ?? 'solve';
-  return mode === 'teach' ? <TeachLayout /> : <SolveLayout />;
+  const { taskId } = useParams();
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="text-2xl font-bold">Задача {taskId}</div>
+      <div className="opacity-80">Здесь позже будет режим решения/преподавания</div>
+      <Link to="/app/tasks" className="text-primary-900 underline">← Вернуться к заданиям</Link>
+    </div>
+  );
 }
