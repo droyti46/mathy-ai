@@ -56,7 +56,7 @@ class OpenRouterAdapter(ILLM):
             wrap_user=[0],
             user_var="input"
         )
-        return await self._chat(messages, model=self.s.LLM_MODEL_HINT)
+        return await self._chat(messages, model=self.s.LLM_MODEL_ASSISTANT)
 
     async def solve(self, task: str) -> str:
         """Решает задание"""
@@ -84,6 +84,5 @@ class OpenRouterAdapter(ILLM):
             "check_solution",
             vars={'task': task_md, 'solution': solution_text},
         )
-        print(messages)
 
         return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)

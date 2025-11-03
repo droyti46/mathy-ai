@@ -94,13 +94,10 @@ async def my_stats(
 ):
     db = await _resolve_user(uow, user, login, None)
     attempts = await uow.attempts.list_by_user(db["id"])
-    solved_by_attempts = sum(
-        1 for a in attempts if is_attempt_solved(a.get("score"), a.get("feedback"))
-    )
     stats = ensure_user_stats(db.get("stats"))
 
     attempts_count = max(int(stats.get("attempts", 0)), len(attempts))
-    solved_count = max(int(stats.get("solved_tasks", 0)), solved_by_attempts)
+    solved_count = stats.get("solved_tasks", 0)
 
     return StatsOut(
         solved=solved_count,
