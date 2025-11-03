@@ -1,4 +1,4 @@
-# app/api/routers/attempts.py (фрагменты)
+# app/api/routers/submit.py (фрагменты)
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from app.api.schemas.attempt import AttemptIn, AttemptOut, Feedback, Span
 from app.api.schemas.auth import StatsOut
@@ -107,36 +107,32 @@ async def create_attempt(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # 2) оценка LLM (градер)
-    result = await llm.grade(task.statement_md, payload.text, reference=task.reference_solution_md)
+    # 2) LLM теперь возвращает размеченный текст с <w message="...">...</w>
+    marked = await llm.check_solution(task.statement_md, payload.text)
+    stitched_solution, marker_spans, marker_msgs = postprocess_marked_text(payload.text, marked)
 
-    fb = _build_feedback(result)
-    score = result.get("score") if isinstance(result, dict) else None
-
-    marked = await llm.mark_errors(task.statement_md, payload.text)
-    stitched_solution, marker_spans = postprocess_marked_text(payload.text, marked)
-
-    if not fb.spans and marker_spans:
-        fb.spans = marker_spans
-    if not fb.spans_detail and marker_spans:
-        fb.spans_detail = [Span(start=s, end=e) for s, e in marker_spans]
+    spans_detail = [
+        Span(start=s, end=e, message=(marker_msgs[i] if i < len(marker_msgs) else ""), severity="error")
+        for i, (s, e) in enumerate(marker_spans)
+    ]
+    feedback = Feedback(summary="", spans=marker_spans, spans_detail=spans_detail)
+    score = None
 
     now = _now_iso()
-
     user_id = await _resolve_user_id(uow, user, payload.login)
 
     attempt_id = await uow.attempts.save({
         "task_id": payload.task_id,
         "mode": payload.mode,
-        "solution_text": stitched_solution,   # ← сохраняем размеченный текст
-        "feedback": fb.model_dump(),
+        "solution_text": stitched_solution,   # сохраняем размеченный текст
+        "feedback": feedback.model_dump(),
         "score": score,
         "time_spent_sec": payload.time_spent_sec,
         "created_at": now,
         "user_id": user_id,
     })
 
-    is_solved = is_attempt_solved(score, fb)
+    is_solved = is_attempt_solved(score, feedback)
 
     stats_result = await _maybe_update_user_stats(
         uow, user_id, payload.task_id, task.difficulty, is_solved
@@ -151,7 +147,7 @@ async def create_attempt(
         id=str(attempt_id),
         task_id=payload.task_id,
         solution_text=stitched_solution,
-        feedback=fb,
+        feedback=feedback,
         score=score,
         created_at=now,
         is_solved=is_solved,
@@ -174,15 +170,18 @@ async def create_attempt_file(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # 2) OCR → text
+    # 2) OCR → text → LLM разметка
     text = await ocr.extract_text(file)
-    marked = await llm.mark_errors(task.statement_md, text)
-    stitched_solution, marker_spans = postprocess_marked_text(text, marked)
+    marked = await llm.check_solution(task.statement_md, text)
+    stitched_solution, marker_spans, marker_msgs = postprocess_marked_text(text, marked)
 
-    feedback = Feedback(summary="", spans=marker_spans, spans_detail=[Span(start=s, end=e) for s, e in marker_spans])
+    spans_detail = [
+        Span(start=s, end=e, message=(marker_msgs[i] if i < len(marker_msgs) else ""), severity="error")
+        for i, (s, e) in enumerate(marker_spans)
+    ]
+    feedback = Feedback(summary="", spans=marker_spans, spans_detail=spans_detail)
 
     now = _now_iso()
-
     user_id = await _resolve_user_id(uow, user, login)
 
     attempt_id = await uow.attempts.save({

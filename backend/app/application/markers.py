@@ -145,13 +145,31 @@ def _norm(s: str) -> str:
 
 
 def _extract_spans(generated_text: str) -> list[str]:
-    gt = re.sub(r"</w>\s*<w>", " ", generated_text)
+    """Достаёт внутренние тексты помеченных фрагментов из <w ...>...</w>."""
+    gt = re.sub(r"</w>\s*<w\b[^>]*>", " ", generated_text)
     spans: list[str] = []
-    for m in re.finditer(r"<w>(.*?)</w>", gt, flags=re.DOTALL):
-        inner = re.sub(r"</?w>", "", m.group(1)).strip()
+    for m in re.finditer(r"<w\b[^>]*>(.*?)</w>", gt, flags=re.DOTALL):
+        inner = re.sub(r"</?w\b[^>]*>", "", m.group(1)).strip()
         if _norm(inner):
             spans.append(inner)
     return spans
+
+def _extract_messages(generated_text: str) -> list[str]:
+    """
+    Возвращает список значений атрибута message из стартовых тегов <w ...> в порядке следования.
+    Если у тега нет message, в список добавляется пустая строка.
+    """
+    gt = re.sub(r"</w>\s*<w\b[^>]*>", " ", generated_text)
+    msgs: list[str] = []
+    for m in re.finditer(r"<w\b([^>]*)>", gt, flags=re.DOTALL):
+        attrs = m.group(1) or ""
+        mm = re.search(r'\bmessage=(?:"([^"]*)"|\'([^\']*)\')', attrs, flags=re.DOTALL)
+        if mm:
+            val = mm.group(1) if mm.group(1) is not None else mm.group(2) or ""
+            msgs.append(val.strip())
+        else:
+            msgs.append("")
+    return msgs
 
 
 _LATEX_TO_UNI = {
@@ -415,6 +433,7 @@ def _best_fuzzy_span(text: str, start_pos: int, pattern: str, *, window: int = 2
 
 def stitch_markers_fast(original_text: str, generated_text: str, neighbor_margin: float = 0.12) -> str:
     gen_spans = _extract_spans(generated_text)
+    gen_msgs = _extract_messages(generated_text)
     if not gen_spans:
         return original_text
 
@@ -446,25 +465,38 @@ def stitch_markers_fast(original_text: str, generated_text: str, neighbor_margin
         s, e = best_g["start"], best_g["end"]
         if s > pos:
             out.append(original_text[pos:s])
-        out.append("<w>" + original_text[s:e] + "</w>")
+
+        def _esc_attr(v: str) -> str:
+            return (
+                v.replace("&", "&amp;")
+                 .replace('"', "&quot;")
+                 .replace("<", "&lt;")
+                 .replace(">", "&gt;")
+            )
+
+        attr = ""
+        if i < len(gen_msgs) and gen_msgs[i]:
+            attr = f' message="{_esc_attr(gen_msgs[i])}"'
+
+        out.append(f"<w{attr}>" + original_text[s:e] + "</w>")
         pos = e
         i += 1
 
     out.append(original_text[pos:])
     return "".join(out)
 
-
 def extract_tag_segments(text: str) -> List[List[int]]:
     segments: List[List[int]] = []
     plain_pos = 0
-    token_pattern = re.compile(r"<w>|</w>|[^<]+|<")
+    # Поддерживаем стартовые теги с атрибутами: <w ...>
+    token_pattern = re.compile(r"<w\b[^>]*>|</w>|[^<]+|<")
 
     active = False
     start_pos: int | None = None
 
     for m in token_pattern.finditer(text):
         token = m.group(0)
-        if token == "<w>":
+        if token.startswith("<w"):
             active = True
             start_pos = plain_pos
         elif token == "</w>":
@@ -502,8 +534,16 @@ def extract_marked_solution(raw_text: str) -> str:
     return text.strip()
 
 
-def postprocess_marked_text(original: str, raw_marked: str) -> Tuple[str, List[List[int]]]:
+def postprocess_marked_text(original: str, raw_marked: str) -> Tuple[str, List[List[int]], List[str]]:
+    """
+    Возвращает:
+      - stitched: исходный текст с пришитыми <w message="...">...</w>
+      - segments: [[start, end], ...] в координатах plain-текста
+      - messages: список сообщений по порядку тегов
+    """
     cleaned = extract_marked_solution(raw_marked)
     stitched = stitch_markers_fast(original, cleaned)
     segments = extract_tag_segments(stitched)
-    return stitched, segments
+    messages = _extract_messages(cleaned)
+    return stitched, segments, messages
+

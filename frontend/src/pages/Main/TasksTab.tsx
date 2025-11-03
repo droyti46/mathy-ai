@@ -19,6 +19,7 @@ type Difficulty = 'easy'|'medium'|'hard';
 type Task = {
   id: string;
   theme_id: string;
+  theme_title: string;
   difficulty: Difficulty;
   name: string;
   statement_md: string;
@@ -318,7 +319,7 @@ function TaskRow({ task, even, onClick }: { task: Task; even: boolean; onClick: 
         <div className="text-primary-900 text-xl">{starsByDifficulty(task.difficulty)}</div>
         <div className="flex items-center gap-3 text-right">
           {icon && <img src={icon} alt="" className="w-[100px] object-contain" />}
-          <div className="text-sm opacity-80">{task.theme_id}</div>
+          <div className="text-sm">{task.theme_title}</div>
         </div>
       </div>
     </div>

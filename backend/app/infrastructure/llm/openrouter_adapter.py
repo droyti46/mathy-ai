@@ -59,8 +59,13 @@ class OpenRouterAdapter(ILLM):
         return await self._chat(messages, model=self.s.LLM_MODEL_HINT)
 
     async def solve(self, task: str) -> str:
-        system = "You are an expert math teacher. Provide a complete step-by-step solution in Markdown."
-        return await self._chat([{"role": "system", "content": system}, {"role": "user", "content": task}], model=self.s.LLM_MODEL_SOLVE)
+        """Решает задание"""
+        messages = self.prompts.build(
+            "solver",
+            vars={'task': task},
+            wrap_user="all"
+        )
+        return await self._chat(messages, model=self.s.LLM_MODEL_SOLVE)
 
     async def image_to_text_bytes(self, image_bytes: bytes, mime: str = "image/png") -> str:
         b64 = base64.b64encode(image_bytes).decode("ascii")
@@ -73,55 +78,12 @@ class OpenRouterAdapter(ILLM):
         resp = await anyio.to_thread.run_sync(_do)
         return (resp.choices[0].message.content or "").strip()
     
-    async def grade(self, task_md: str, solution_text: str, reference: str = "") -> dict:
-        system = (
-            "Ты математический проверяющий. "
-            "Верни ТОЛЬКО JSON с ключами: summary (строка) и score (от 0 до 1, необязательный). "
-            "Не раскрывай конечный числовой ответ; дай содержательную обратную связь."
+    async def check_solution(self, task_md: str, solution_text: str) -> dict:
+        '''Проверяет решение студента и возвращает размеченное решение студента с тегами <w message="">...</w>'''
+        messages = self.prompts.build(
+            "check_solution",
+            vars={'task': task_md, 'solution': solution_text},
         )
+        print(messages)
 
-        user = (
-            f"Задача:\n{task_md}\n\n"
-            f"Решение студента (текст):\n{solution_text}\n\n"
-            f"Эталонное решение (необязательно):\n{reference}\n\n"
-            "Отметь только действительно значимые ошибки — неверные шаги рассуждений, пропущенные случаи или неверные формулы."
-        )
-
-        # выберем модель для градинга: LLM_MODEL_GRADE если есть, иначе LLM_MODEL_CHECK
-        model = getattr(self.s, "LLM_MODEL_GRADE", None) or self.s.LLM_MODEL_CHECK
-        rf = {"type": "json_object"} if getattr(self.s, "STRICT_JSON", False) else None
-
-        text = await self._chat(
-            [
-                {"role": "system", "content": system},
-                {"role": "user",  "content": user},
-            ],
-            model=model,
-            response_format=rf,
-        )
-
-        # вытащим JSON из возможного текста вокруг
-        m = re.search(r"\{.*\}", text, re.S)
-        blob = m.group(0) if m else text
-        try:
-            data = json.loads(blob)
-        except Exception:
-            data = {"summary": text[:500]}
-
-        # Если модель всё же вернула spans, аккуратно нормализуем, иначе удалим ключ.
-        raw_spans = data.get("spans")
-        if raw_spans:
-            norm_spans = []
-            for item in raw_spans:
-                if isinstance(item, dict):
-                    norm_spans.append([int(item.get("start", 0)), int(item.get("end", 0))])
-                elif isinstance(item, (list, tuple)) and len(item) >= 2:
-                    norm_spans.append([int(item[0]), int(item[1])])
-            if norm_spans:
-                data["spans"] = norm_spans
-            else:
-                data.pop("spans", None)
-        else:
-            data.pop("spans", None)
-
-        return data
+        return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)
