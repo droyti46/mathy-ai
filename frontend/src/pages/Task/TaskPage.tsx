@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/api/axios';
 import { fetchWithAuthOnce, streamText } from '@/lib/api/stream';
 import { createStreamMerger } from '@/lib/api/stream_delta';
+import { CopyButton } from '@/components/CopyButton'
 
 import Markdown from '@/components/Markdown';
 import SolveLayout from './SolveMode/SolveLayout';
@@ -16,6 +17,7 @@ import errorIcon from '@/assets/images/error.png';
 import mascotFaceWithoutPupils from '@/assets/images/mascot-face-without-pupils.png';
 import MascotEyes from "@/components/MascotEyes";
 
+const META_MARK = '[[META]]';
 
 type Difficulty = 'easy'|'medium'|'hard';
 
@@ -269,27 +271,60 @@ export default function TaskPage() {
     setTeacherInput('');
     setTeacherLoading(true);
 
+    // плейсхолдер для накопления ответа учителя
     setTeacherMsgs(prev => [...prev, { role: 'assistant', content: '' }]);
 
+    // используем наш «мерджер» из предыдущего шага (устойчив к накопит. чанкам)
+    const { createStreamMerger } = await import('@/lib/api/stream_delta');
     const merge = createStreamMerger('');
 
     try {
       await streamText(
-        `/api/tasks/${taskId}/teacher/stream`,          // или teacher/stream
+        `/api/tasks/${taskId}/teacher/stream`,
         { messages: msgs },
         (rawChunk) => {
-          const full = merge.push(rawChunk);             // <-- получаем ПОЛНЫЙ текст
-          setTeacherMsgs(prev => {                     // или setTeacherMsgs
+          // проверяем, не пришёл ли мета-чанк
+          const idx = rawChunk.indexOf(META_MARK);
+          if (idx >= 0) {
+            // левая часть — продолжение текста
+            const left = rawChunk.slice(0, idx);
+            const fullLeft = merge.push(left);
+            setTeacherMsgs(prev => {
+              const copy = prev.slice();
+              const last = copy[copy.length - 1];
+              if (last?.role === 'assistant') last.content = fullLeft;
+              return copy;
+            });
+
+            // правая часть — JSON метаданных (может быть с \n в конце)
+            const metaRaw = rawChunk.slice(idx + META_MARK.length).trim();
+            try {
+              const meta = JSON.parse(metaRaw);
+              if (meta?.type === 'teacher_meta' && meta?.is_solved && meta?.coins_rewarded > 0) {
+                setCongrats({ coins: meta.coins_rewarded });
+              }
+            } catch {
+              // тихо игнорируем, если вдруг обрезался чанк — на практике придёт целиком
+            }
+            return; // мету в чат не рендерим
+          }
+
+          // обычный чанк текста
+          const full = merge.push(rawChunk);
+          setTeacherMsgs(prev => {
             const copy = prev.slice();
             const last = copy[copy.length - 1];
-            if (last?.role === 'assistant') last.content = full; // <-- ставим итог
+            if (last?.role === 'assistant') last.content = full;
             return copy;
           });
         },
-        { onDone: () => setAssistantLoading(false), onError: () => setAssistantLoading(false) }
+        {
+          onDone: () => setTeacherLoading(false),
+          onError: () => setTeacherLoading(false),
+        }
       );
     } catch {
-      // no-op
+      // оставляем накопленный текст как есть
     } finally {
       setTeacherLoading(false);
     }
@@ -569,9 +604,10 @@ function BuySolution({ loading, onBuy, text }: { loading: boolean; onBuy: () => 
           <button
             disabled={loading}
             onClick={onBuy}
-            className="mt-6 rounded-xl2 px-6 py-3 font-semibold bg-white border-2 border-primary-500 text-primary-900 hover:bg-primary-200 transition disabled:opacity-70"
+            className="mt-6 flex items-center justify-center gap-2 rounded-xl2 px-6 py-3 font-semibold bg-white border-2 border-primary-500 text-primary-900 hover:bg-primary-200 transition disabled:opacity-70 mx-auto block"
           >
-            {loading ? 'Покупаем…' : 'Купить решение 13 🪙'}
+            {loading ? 'Покупаем…' : 'Купить решение 13'}
+            <img src={ducklar} alt="" className="w-[32px]" />
           </button>
         </>
       )}
@@ -680,9 +716,12 @@ function AssistantBlock({
   }, [messages, loading]);
 
   return (
-    <div className="h-full min-h-0 flex flex-col text-neutral-900">
+    <div className="h-full min-h-0 flex flex-col text-neutral-900" aria-busy={loading || undefined} aria-live="polite">
       <div className="flex items-center justify-between sticky top-0 z-10">
-        <div className="text-lg font-semibold">AI помощник</div>
+        <div className="text-lg font-semibold flex items-center gap-2">
+          AI помощник
+          {loading && <PulseDot />} {/* ← пульсирующая точка во время генерации */}
+        </div>
         <button onClick={onReset} disabled={loading} className="opacity-70 hover:opacity-100 transition disabled:opacity-40">
           <img src={reloadIcon} alt="reload" className="w-6 h-6" />
         </button>
@@ -706,8 +745,24 @@ function AssistantBlock({
         ) : (
           <div ref={scrollRef} className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]">
             {messages.map((m, i) => (
-              <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                <div className={'inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' + (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')}>
+              <div
+                key={i}
+                className={'group ' + (m.role === 'user' ? 'text-right' : 'text-left')}
+              >
+                <div
+                  className={
+                    'relative inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' +
+                    (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')
+                  }
+                >
+                  {/* Кнопка копирования — только для ответов ассистента */}
+                  {m.role !== 'user' && (
+                    <CopyButton
+                      text={m.content}
+                      className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      label="Скопировать ответ"
+                    />
+                  )}
                   <Markdown className="md">{m.content}</Markdown>
                 </div>
               </div>
@@ -737,11 +792,12 @@ function AssistantBlock({
         <button
           onClick={onSend}
           disabled={loading || !input.trim()}
-          className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40"
+          className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40 inline-flex items-center"
           aria-disabled={loading}
           title={loading ? 'Модель печатает… отправка недоступна' : 'Отправить'}
         >
           <img src={sendIcon} alt="send" className="w-7 h-7" />
+          {loading && <PulseDot className="ml-2" />} {/* ← точка на кнопке */}
         </button>
       </div>
     </div>
@@ -771,9 +827,12 @@ function TeacherBlock({
   }, [messages, loading]);
 
   return (
-    <div className="h-full min-h-0 flex flex-col text-neutral-900">
+    <div className="h-full min-h-0 flex flex-col text-neutral-900" aria-busy={loading || undefined} aria-live="polite">
       <div className="flex items-center justify-between sticky top-0 z-10">
-        <div className="text-lg font-semibold">AI учитель</div>
+        <div className="text-lg font-semibold flex items-center gap-2">
+          AI учитель
+          {loading && <PulseDot />}  {/* ← точка */}
+        </div>
         <button onClick={onReset} disabled={loading} className="opacity-70 hover:opacity-100 transition disabled:opacity-40">
           <img src={reloadIcon} alt="reload" className="w-6 h-6" />
         </button>
@@ -793,8 +852,23 @@ function TeacherBlock({
         ) : (
           <div ref={scrollRef} className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]">
             {messages.map((m, i) => (
-              <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                <div className={'inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' + (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')}>
+              <div
+                key={i}
+                className={'group ' + (m.role === 'user' ? 'text-right' : 'text-left')}
+              >
+                <div
+                  className={
+                    'relative inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' +
+                    (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')
+                  }
+                >
+                  {m.role !== 'user' && (
+                    <CopyButton
+                      text={m.content}
+                      className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      label="Скопировать ответ"
+                    />
+                  )}
                   <Markdown className="md">{m.content}</Markdown>
                 </div>
               </div>
@@ -824,11 +898,12 @@ function TeacherBlock({
           <button
             onClick={onSend}
             disabled={loading || !input.trim()}
-            className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40"
+            className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40 inline-flex items-center"
             aria-disabled={loading}
             title={loading ? 'Модель печатает… отправка недоступна' : 'Отправить'}
           >
             <img src={sendIcon} alt="send" className="w-7 h-7" />
+            {loading && <PulseDot className="ml-2" />}
           </button>
         </div>
       )}
@@ -877,4 +952,14 @@ function useAutoGrowTextarea(
     el.style.height = newH + 'px';
     el.style.overflowY = el.scrollHeight > newH ? 'auto' : 'hidden';
   }, [ref, value, maxRows]);
+}
+
+function PulseDot({ className = '', title = 'Генерирую…' }: { className?: string; title?: string }) {
+  return (
+    <span
+      className={`inline-block w-2.5 h-2.5 rounded-full bg-primary-500 animate-pulse ${className}`}
+      aria-label={title}
+      title={title}
+    />
+  );
 }

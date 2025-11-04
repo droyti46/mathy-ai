@@ -58,6 +58,7 @@ async def solve_task(
 
     return ChatOut(messages=[ChatMessage(role="assistant", content=text)])
 
+@router.post("/{task_id}/solve/stream")
 async def solve_task_stream(task_id: str, login: Optional[str] = None, uow=Depends(get_uow), llm=Depends(get_llm), user=Depends(get_user_opt)):
     user_id = await resolve_user_id(uow, user, login)
     if not user_id:
