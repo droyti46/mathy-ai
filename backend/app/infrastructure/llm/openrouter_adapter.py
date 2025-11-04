@@ -2,7 +2,7 @@ import base64
 import json
 
 import anyio
-from typing import Sequence, Dict, Any
+from typing import Sequence, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
 from app.infrastructure.prompts.text_store import PromptTextStore
 from app.application.interfaces.llm import ILLM
@@ -24,6 +24,39 @@ class OpenRouterAdapter(ILLM):
             default_headers={"HTTP-Referer": "http://localhost:8000", "X-Title": self.s.APP_NAME},
         )
         self.prompts = PromptTextStore(base_dir="app/infrastructure/prompts")
+
+    async def _stream_chat(self, *, messages, model: str) -> AsyncGenerator[str, None]:
+        """
+        Асинхронный генератор, выдающий токены текста по мере генерации.
+        Реализовано через stream=True в openai sdk + мост через anyio.
+        """
+        send, recv = anyio.create_memory_object_stream[str](max_buffer_size=200)
+
+        def _producer():
+            stream = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+            )
+            try:
+                for ev in stream:
+                    # OpenAI совместимый формат
+                    delta: Optional[str] = None
+                    try:
+                        delta = ev.choices[0].delta.content
+                    except Exception:
+                        delta = None
+                    if delta:
+                        anyio.from_thread.run(send.send, delta)
+            finally:
+                anyio.from_thread.run(send.aclose)
+
+        # крутим продьюсер в отдельном потоке
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(anyio.to_thread.run_sync, _producer)
+            async with recv:
+                async for chunk in recv:
+                    yield chunk
 
     async def _chat(self, messages, model: str, response_format: Dict[str, Any] | None = None) -> str:
         def _do():
@@ -104,3 +137,25 @@ class OpenRouterAdapter(ILLM):
         )
 
         return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)
+
+    async def hint_stream(self, task: str, chat_history: Sequence[Dict[str, str]]) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build(
+            "assistant", chat_history=chat_history, vars={'task': task}, wrap_user=[0], user_var="input"
+        )
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_ASSISTANT):
+            yield tok
+
+    async def init_teacher_mode_stream(self, task: str) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build("teacher", vars={'task': task})
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_CHECK):
+            yield tok
+
+    async def teacher_message_stream(self, task: str, chat_history: Sequence[Dict[str, str]]) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build("teacher", chat_history=chat_history, vars={"task": task}, wrap_user=[0])
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_ASSISTANT):
+            yield tok
+
+    async def solve_stream(self, task: str) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build("solver", vars={'task': task}, wrap_user="all")
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_SOLVE):
+            yield tok
