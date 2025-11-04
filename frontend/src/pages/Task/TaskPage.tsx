@@ -229,28 +229,52 @@ export default function TaskPage() {
     setTeacherLoading(true);
     try {
       const { data } = await api.post<ChatOut>(`/api/tasks/${taskId}/teacher/init`);
-      setTeacherMsgs(data.messages);
+      const srv = data?.messages ?? [];
+      setTeacherMsgs(srv); // могут прислать только приветствие ассистента — норм
     } finally {
       setTeacherLoading(false);
     }
   };
+
   const sendTeacher = async () => {
     if (!teacherMsgs || teacherLoading) return;
+
     const content = teacherInput.trim();
     if (!content) return;
 
     const msgs = [...teacherMsgs, { role: 'user', content } as ChatMessage];
-    setTeacherMsgs(msgs);
+    setTeacherMsgs(msgs);          // оптимистично показываем юзера
     setTeacherInput('');
     setTeacherLoading(true);
+
     try {
       const { data } = await api.post<TeacherOut>(`/api/tasks/${taskId}/teacher`, { messages: msgs });
-      setTeacherMsgs(data.messages);
+      const srv = data?.messages ?? [];
+
+      // Если сервер вдруг отдал полную историю — используем её
+      if (srv.length > msgs.length) {
+        setTeacherMsgs(srv);
+      } else {
+        // Иначе сервер вернул только последний ответ ассистента — аккуратно добавим его
+        const assistantReply = [...srv].reverse().find(m => m.role === 'assistant');
+        if (assistantReply) {
+          setTeacherMsgs(prev => {
+            const last = prev[prev.length - 1];
+            // защита от дублей по роли+контенту
+            if (last?.role === 'assistant' && last?.content === assistantReply.content) return prev;
+            return [...prev, assistantReply];
+          });
+        }
+      }
+
       if (data.is_solved) setCongrats({ coins: data.coins_rewarded ?? 0 });
+    } catch {
+      // можно показать тост об ошибке; локальная история уже сохранена оптимистично
     } finally {
       setTeacherLoading(false);
     }
   };
+
   const resetTeacher = () => {
     if (teacherLoading) return;
     setTeacherMsgs(null);
