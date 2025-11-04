@@ -16,7 +16,7 @@ async def init_teacher_mode(task_id: str, uow = Depends(get_uow), llm = Depends(
     text = await llm.init_teacher_mode(task)
     return ChatOut(messages=[ChatMessage(role="assistant", content=text)])
 
-@router.post("/{task_id}/teacher", response_model=ChatOut)
+@router.post("/{task_id}/teacher", response_model=TeacherAttemptOut)
 async def teacher_message(
     task_id: str,
     payload: ChatRequest,

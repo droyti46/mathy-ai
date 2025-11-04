@@ -32,3 +32,9 @@ body { @apply font-sans text-neutral-900; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.md {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
