@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/api/axios';
+import { fetchWithAuthOnce, streamText } from '@/lib/api/stream';
+import { createStreamMerger } from '@/lib/api/stream_delta';
+
 import Markdown from '@/components/Markdown';
 import SolveLayout from './SolveMode/SolveLayout';
 
@@ -12,6 +15,7 @@ import clockIcon from '@/assets/images/clock.png';
 import errorIcon from '@/assets/images/error.png';
 import mascotFaceWithoutPupils from '@/assets/images/mascot-face-without-pupils.png';
 import MascotEyes from "@/components/MascotEyes";
+
 
 type Difficulty = 'easy'|'medium'|'hard';
 
@@ -120,15 +124,23 @@ export default function TaskPage() {
   const buySolution = async () => {
     try {
       setBuyLoading(true);
-      const { data } = await api.post<ChatOut>(`/api/tasks/${taskId}/solve`);
-      const text = (data.messages ?? []).map(m => m.content).join('\n\n');
-      setBoughtSolution(text || 'Решение получено.');
-    } catch (e: any) {
-      if (e?.response?.status === 402) {
-        setBoughtSolution('Недостаточно монет для покупки решения.');
-      } else {
-        setBoughtSolution('Не удалось получить решение. Попробуйте позже.');
+      setBoughtSolution('');
+      const res = await fetchWithAuthOnce(`/api/tasks/${taskId}/solve/stream`, {});
+      if (res.status === 402) { setBoughtSolution('Недостаточно монет для покупки решения.'); return; }
+      if (!res.ok || !res.body) throw new Error(await res.text().catch(()=> 'HTTP error'));
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      const merge = createStreamMerger('');
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const full = merge.push(decoder.decode(value, { stream: true }));
+        setBoughtSolution(full); // <-- просто ставим итог
       }
+    } catch {
+      setBoughtSolution('Не удалось получить решение. Попробуйте позже.');
     } finally {
       setBuyLoading(false);
     }
@@ -189,29 +201,29 @@ export default function TaskPage() {
     setAssistantInput('');
     setAssistantLoading(true);
 
+    // Под ассистента — пустой контейнер
+    setAssistantMsgs(prev => [...prev, { role: 'assistant', content: '' }]);
+
+    // Аккумулятор, чтобы добавлять только приращение
+    const merge = createStreamMerger('');
+
     try {
-      const { data } = await api.post<ChatOut>(`/api/tasks/${taskId}/assistant`, { messages: msgs });
-      const srv = data?.messages ?? [];
-
-      // 1) Если сервер вернул всю историю (должно быть больше, чем локально отправили — т.е. плюс ответ ассистента)
-      if (srv.length > msgs.length) {
-        setAssistantMsgs(srv);
-        return;
-      }
-
-      // 2) Иначе сервер прислал только последний ответ ассистента — аккуратно добавим его в хвост
-      const assistantReply = srv.find(m => m.role === 'assistant');
-      if (assistantReply) {
-        setAssistantMsgs(prev => {
-          const last = prev[prev.length - 1];
-          // простая защита от дублей по роли+контенту
-          if (last?.role === 'assistant' && last?.content === assistantReply.content) return prev;
-          return [...prev, assistantReply];
-        });
-      }
-      // если вообще ничего не пришло — оставляем локальную историю как есть
+      await streamText(
+        `/api/tasks/${taskId}/assistant/stream`,          // или teacher/stream
+        { messages: msgs },
+        (rawChunk) => {
+          const full = merge.push(rawChunk);             // <-- получаем ПОЛНЫЙ текст
+          setAssistantMsgs(prev => {                     // или setTeacherMsgs
+            const copy = prev.slice();
+            const last = copy[copy.length - 1];
+            if (last?.role === 'assistant') last.content = full; // <-- ставим итог
+            return copy;
+          });
+        },
+        { onDone: () => setAssistantLoading(false), onError: () => setAssistantLoading(false) }
+      );
     } catch {
-      // опционально показать тост об ошибке
+      // оставляем, что насобирали
     } finally {
       setAssistantLoading(false);
     }
@@ -227,49 +239,57 @@ export default function TaskPage() {
   const startTeacher = async () => {
     if (teacherLoading) return;
     setTeacherLoading(true);
+    setTeacherMsgs([{ role: 'assistant', content: '' }]); // плейсхолдер
+
     try {
-      const { data } = await api.post<ChatOut>(`/api/tasks/${taskId}/teacher/init`);
-      const srv = data?.messages ?? [];
-      setTeacherMsgs(srv); // могут прислать только приветствие ассистента — норм
-    } finally {
+      await streamText(
+        `/api/tasks/${taskId}/teacher/init/stream`,
+        {},
+        (chunk) => {
+          setTeacherMsgs(prev => {
+            const copy = prev.slice();
+            copy[0] = { role: 'assistant', content: (copy[0].content || '') + chunk };
+            return copy;
+          });
+        },
+        { onDone: () => setTeacherLoading(false), onError: () => setTeacherLoading(false) }
+      );
+    } catch {
       setTeacherLoading(false);
     }
   };
 
   const sendTeacher = async () => {
     if (!teacherMsgs || teacherLoading) return;
-
     const content = teacherInput.trim();
     if (!content) return;
 
     const msgs = [...teacherMsgs, { role: 'user', content } as ChatMessage];
-    setTeacherMsgs(msgs);          // оптимистично показываем юзера
+    setTeacherMsgs(msgs);
     setTeacherInput('');
     setTeacherLoading(true);
 
+    setTeacherMsgs(prev => [...prev, { role: 'assistant', content: '' }]);
+
+    const merge = createStreamMerger('');
+
     try {
-      const { data } = await api.post<TeacherOut>(`/api/tasks/${taskId}/teacher`, { messages: msgs });
-      const srv = data?.messages ?? [];
-
-      // Если сервер вдруг отдал полную историю — используем её
-      if (srv.length > msgs.length) {
-        setTeacherMsgs(srv);
-      } else {
-        // Иначе сервер вернул только последний ответ ассистента — аккуратно добавим его
-        const assistantReply = [...srv].reverse().find(m => m.role === 'assistant');
-        if (assistantReply) {
-          setTeacherMsgs(prev => {
-            const last = prev[prev.length - 1];
-            // защита от дублей по роли+контенту
-            if (last?.role === 'assistant' && last?.content === assistantReply.content) return prev;
-            return [...prev, assistantReply];
+      await streamText(
+        `/api/tasks/${taskId}/teacher/stream`,          // или teacher/stream
+        { messages: msgs },
+        (rawChunk) => {
+          const full = merge.push(rawChunk);             // <-- получаем ПОЛНЫЙ текст
+          setTeacherMsgs(prev => {                     // или setTeacherMsgs
+            const copy = prev.slice();
+            const last = copy[copy.length - 1];
+            if (last?.role === 'assistant') last.content = full; // <-- ставим итог
+            return copy;
           });
-        }
-      }
-
-      if (data.is_solved) setCongrats({ coins: data.coins_rewarded ?? 0 });
+        },
+        { onDone: () => setAssistantLoading(false), onError: () => setAssistantLoading(false) }
+      );
     } catch {
-      // можно показать тост об ошибке; локальная история уже сохранена оптимистично
+      // no-op
     } finally {
       setTeacherLoading(false);
     }

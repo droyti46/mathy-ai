@@ -159,3 +159,8 @@ class OpenRouterAdapter(ILLM):
         messages = self.prompts.build("solver", vars={'task': task}, wrap_user="all")
         async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_SOLVE):
             yield tok
+
+    @classmethod
+    def from_settings(cls, s: Settings) -> "OpenRouterAdapter":
+        # ВАЖНО: передаём и adapter, и settings
+        return cls(s)
