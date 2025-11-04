@@ -637,6 +637,8 @@ function EditorBlock({
 
 /* ---------- AI помощник (фикс истории + блокировка) ---------- */
 
+/* ---------- AI помощник (со скроллбаром) ---------- */
+
 function AssistantBlock({
   messages, input, setInput, onSend, onReset, loading,
 }: {
@@ -647,8 +649,16 @@ function AssistantBlock({
   onReset: () => void;
   loading: boolean;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // автопрокрутка к последнему сообщению
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
+
   return (
-    <div className="h-full flex flex-col text-neutral-900">
+    <div className="h-full min-h-0 flex flex-col text-neutral-900">
       <div className="flex items-center justify-between sticky top-0 z-10">
         <div className="text-lg font-semibold">AI помощник</div>
         <button onClick={onReset} disabled={loading} className="opacity-70 hover:opacity-100 transition disabled:opacity-40">
@@ -656,7 +666,7 @@ function AssistantBlock({
         </button>
       </div>
 
-      <div className="flex-1 mt-3 bg-white rounded-xl2 border border-primary-200/60">
+      <div className="flex-1 min-h-0 mt-3 bg-white rounded-xl2 border border-primary-200/60 overflow-hidden">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-90">
             <MascotEyes
@@ -672,7 +682,10 @@ function AssistantBlock({
             </div>
           </div>
         ) : (
-          <div className="p-3 space-y-3 overflow-auto h-full">
+          <div
+            ref={scrollRef}
+            className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]"
+          >
             {messages.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
                 <div className={'inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' + (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')}>
@@ -714,8 +727,16 @@ function TeacherBlock({
   onStart: () => void;
   loading: boolean;
 }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // автопрокрутка при новых сообщениях
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
+
   return (
-    <div className="h-full flex flex-col text-neutral-900">
+    <div className="h-full min-h-0 flex flex-col text-neutral-900">
       <div className="flex items-center justify-between sticky top-0 z-10">
         <div className="text-lg font-semibold">AI учитель</div>
         <button onClick={onReset} disabled={loading} className="opacity-70 hover:opacity-100 transition disabled:opacity-40">
@@ -723,7 +744,7 @@ function TeacherBlock({
         </button>
       </div>
 
-      <div className="flex-1 mt-3 bg-white rounded-xl2 border border-primary-200/60">
+      <div className="flex-1 min-h-0 mt-3 bg-white rounded-xl2 border border-primary-200/60 overflow-hidden">
         {messages === null ? (
           <div className="h-full flex flex-col items-center justify-center">
             <button
@@ -735,7 +756,10 @@ function TeacherBlock({
             </button>
           </div>
         ) : (
-          <div className="p-3 space-y-3 overflow-auto h-full">
+          <div
+            ref={scrollRef}
+            className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]"
+          >
             {messages.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
                 <div className={'inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' + (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')}>
@@ -765,6 +789,7 @@ function TeacherBlock({
     </div>
   );
 }
+
 
 /* ---------- подсветка текста ---------- */
 
