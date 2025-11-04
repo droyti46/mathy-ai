@@ -635,9 +635,9 @@ function EditorBlock({
   );
 }
 
-/* ---------- AI помощник (фикс истории + блокировка) ---------- */
-
 /* ---------- AI помощник (со скроллбаром) ---------- */
+
+/* ---------- AI помощник (Shift+Enter, можно печатать во время ответа, авто-рост textarea) ---------- */
 
 function AssistantBlock({
   messages, input, setInput, onSend, onReset, loading,
@@ -650,8 +650,10 @@ function AssistantBlock({
   loading: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  useAutoGrowTextarea(taRef, input, 6); // <-- N = 6 строк
 
-  // автопрокрутка к последнему сообщению
+  // автопрокрутка ленты сообщений
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -674,7 +676,7 @@ function AssistantBlock({
               leftEye={{ cxPct: 10, cyPct: 30, radiusPct: 45 }}
               rightEye={{ cxPct: 90, cyPct: 30, radiusPct: 45 }}
               pupilSize={30}
-              pupilColor='white'
+              pupilColor="white"
               className="mx-auto w-[200px] mb-6 pointer-events-none"
             />
             <div className="mt-3 text-center px-3">
@@ -682,10 +684,7 @@ function AssistantBlock({
             </div>
           </div>
         ) : (
-          <div
-            ref={scrollRef}
-            className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]"
-          >
+          <div ref={scrollRef} className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]">
             {messages.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
                 <div className={'inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' + (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')}>
@@ -697,16 +696,31 @@ function AssistantBlock({
         )}
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <input
+      <div className="mt-3 flex items-end gap-2">
+        <textarea
+          ref={taRef}
+          rows={1}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => (!loading && e.key === 'Enter' ? onSend() : undefined)}
-          disabled={loading}
-          placeholder="Shift+Enter, чтобы вставить пустую строку"
-          className="flex-1 rounded-xl2 px-4 py-3 bg-primary-900/10 outline-none disabled:opacity-60"
+          onChange={(e) => setInput(e.target.value)}         // ← можно печатать всегда
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (e.shiftKey) return;                        // Shift+Enter = перенос строки
+              e.preventDefault();
+              if (!loading) onSend();                        // во время ответа отправка запрещена
+            }
+          }}
+          placeholder="Shift+Enter — перенос строки"
+          className="flex-1 rounded-xl2 px-4 py-3 bg-primary-900/10 outline-none
+                     disabled:opacity-60 resize-none leading-6"
+          // НЕ отключаем textarea при loading — сохраняем фокус
         />
-        <button onClick={onSend} disabled={loading} className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40">
+        <button
+          onClick={onSend}
+          disabled={loading || !input.trim()}
+          className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40"
+          aria-disabled={loading}
+          title={loading ? 'Модель печатает… отправка недоступна' : 'Отправить'}
+        >
           <img src={sendIcon} alt="send" className="w-7 h-7" />
         </button>
       </div>
@@ -728,8 +742,9 @@ function TeacherBlock({
   loading: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  useAutoGrowTextarea(taRef, input, 6); // <-- N = 6 строк
 
-  // автопрокрутка при новых сообщениях
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -756,10 +771,7 @@ function TeacherBlock({
             </button>
           </div>
         ) : (
-          <div
-            ref={scrollRef}
-            className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]"
-          >
+          <div ref={scrollRef} className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]">
             {messages.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
                 <div className={'inline-block max-w-[80%] rounded-xl2 px-3 py-2 ' + (m.role === 'user' ? 'bg-primary-500 text-white' : 'bg-primary-100')}>
@@ -772,16 +784,30 @@ function TeacherBlock({
       </div>
 
       {messages && (
-        <div className="mt-3 flex items-center gap-2">
-          <input
+        <div className="mt-3 flex items-end gap-2">
+          <textarea
+            ref={taRef}
+            rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => (!loading && e.key === 'Enter' ? onSend() : undefined)}
-            disabled={loading}
-            placeholder="Shift+Enter, чтобы вставить пустую строку"
-            className="flex-1 rounded-xl2 px-4 py-3 bg-primary-900/10 outline-none disabled:opacity-60"
+            onChange={(e) => setInput(e.target.value)}       // ← можно печатать всегда
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (e.shiftKey) return;                      // Shift+Enter = перенос строки
+                e.preventDefault();
+                if (!loading) onSend();                      // во время ответа отправка запрещена
+              }
+            }}
+            placeholder="Shift+Enter — перенос строки"
+            className="flex-1 rounded-xl2 px-4 py-3 bg-primary-900/10 outline-none
+                       disabled:opacity-60 resize-none leading-6"
           />
-          <button onClick={onSend} disabled={loading} className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40">
+          <button
+            onClick={onSend}
+            disabled={loading || !input.trim()}
+            className="p-3 rounded-xl2 hover:bg-primary-900/10 transition disabled:opacity-40"
+            aria-disabled={loading}
+            title={loading ? 'Модель печатает… отправка недоступна' : 'Отправить'}
+          >
             <img src={sendIcon} alt="send" className="w-7 h-7" />
           </button>
         </div>
@@ -806,4 +832,29 @@ function highlightPieces(text: string, spans: Span[]) {
   }
   if (idx < text.length) res.push({ type: 'plain', text: text.slice(idx) });
   return res;
+}
+
+/* ---------- хелпер: авто-рост textarea до N строк ---------- */
+function useAutoGrowTextarea(
+  ref: React.RefObject<HTMLTextAreaElement>,
+  value: string,
+  maxRows = 6
+) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const cs = window.getComputedStyle(el);
+    // fallback для 'normal'
+    const lineHeight =
+      parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize || '16') * 1.5) || 24;
+    const paddingTop = parseFloat(cs.paddingTop || '0');
+    const paddingBottom = parseFloat(cs.paddingBottom || '0');
+    const maxHeight = lineHeight * maxRows + paddingTop + paddingBottom;
+
+    el.style.height = 'auto';
+    const newH = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = newH + 'px';
+    el.style.overflowY = el.scrollHeight > newH ? 'auto' : 'hidden';
+  }, [ref, value, maxRows]);
 }
