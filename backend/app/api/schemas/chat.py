@@ -16,19 +16,8 @@ class ChatMessage(BaseModel):
             return {"role": "user", **value}
         return value
 
-class HintRequest(BaseModel):
+class ChatRequest(BaseModel):
     messages: List[ChatMessage] = Field(default_factory=list)
 
-class HintOut(BaseModel):
+class ChatOut(BaseModel):
     messages: List[ChatMessage]
-    model: str | None = None
-    used_tokens: int | None = None
-    hint_type: str | None = None
-
-class SolutionStep(BaseModel):
-    title: str
-    content_md: str
-
-class SolutionOut(BaseModel):
-    steps: list[SolutionStep]
-    final_answer_md: str | None = None

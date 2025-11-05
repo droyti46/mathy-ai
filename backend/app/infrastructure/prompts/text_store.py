@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Sequence, Union, Iterable
+from typing import Dict, List, Sequence, Union, Iterable, Optional
 from string import Template
 import re
 
@@ -45,7 +45,7 @@ class PromptTextStore:
         name: str,
         *,
         vars: Dict[str, str] | None = None,
-        chat_history: Sequence[Dict[str, str]] = (),
+        chat_history: Optional[Sequence[Dict[str, str]]] = None,
         wrap_user: Union[str, int, Iterable[int], None] = "last",
         user_var: str = "input",
     ) -> List[Dict[str, str]]:
@@ -76,7 +76,7 @@ class PromptTextStore:
             messages.append({"role": "system", "content": self._render(templates["system"], vars)})
 
         # 2) подготовим набор индексов user-сообщений для обёртки
-        hist = list(chat_history)
+        hist = list(chat_history) if chat_history is not None else [{"role": "user", "content": ""}]
         wrap_idx: set[int] = self._resolve_wrap_indices(hist, wrap_user)
 
         # 3) пройдём историю и «обернём» только выбранные user-сообщения

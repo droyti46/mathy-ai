@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
 from app.api.schemas.auth import StatsOut
+from app.api.schemas.chat import ChatMessage
 
 class Span(BaseModel):
     start: int
@@ -11,34 +12,27 @@ class Span(BaseModel):
     severity: str = "info"
 
 class Feedback(BaseModel):
-    summary: str = ""
-    # ТВОЙ формат подсветки:
     spans: List[List[int]] = Field(default_factory=list, exclude=True)
-    # Подробности (для возможных тултипов):
     spans_detail: List[Span] = Field(default_factory=list)
 
 class AttemptIn(BaseModel):
     task_id: str
     text: str = Field(min_length=15)
-    mode: str = "solve"  # "solve" | "learn"
-    time_spent_sec: Optional[int] = None
-    login: Optional[str] = None
-
-    @field_validator("text")
-    @classmethod
-    def _ensure_min_length(cls, value: str) -> str:
-        if len(value.strip()) < 15:
-            raise ValueError("Solution must be at least 15 characters long")
-        return value
+    login: Optional[str] = None 
 
 class AttemptOut(BaseModel):
     id: str
     task_id: str
-    # Текст, который фронт будет подсвечивать
     solution_text: str = ""
     feedback: Feedback
-    score: Optional[float] = None
     created_at: str
+    is_solved: bool = False
+    coins_rewarded: int = 0
+    stats: Optional[StatsOut] = None
+
+class TeacherAttemptOut(BaseModel):
+    task_id: str
+    messages: list[ChatMessage]
     is_solved: bool = False
     coins_rewarded: int = 0
     stats: Optional[StatsOut] = None

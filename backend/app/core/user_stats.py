@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Dict
 
+from app.api.schemas.auth import StatsOut
+
 
 def default_user_stats() -> Dict[str, object]:
     return {
@@ -44,3 +46,52 @@ def coins_for_difficulty(difficulty: str | None) -> int:
         return 5
     return mapping.get(str(difficulty).strip().lower(), 5)
 
+async def resolve_user_id(uow, user: dict | None, login: str | None) -> str | None:
+    if user and user.get("user_id"):
+        return user.get("user_id")
+
+    if login:
+        db_user = await uow.users.get_by_login(login)
+        if db_user:
+            return db_user.get("id")
+
+    return None
+
+async def maybe_update_user_stats(
+    uow,
+    user_id: str | None,
+    task_id: str,
+    task_difficulty: str | None,
+    is_solved_attempt: bool,
+):
+    if not user_id:
+        return None
+
+    db_user = await uow.users.get(user_id)
+    if not db_user:
+        return None
+
+    stats = ensure_user_stats(db_user.get("stats"))
+    stats["attempts"] = int(stats.get("attempts", 0)) + 1
+
+    task_id_str = str(task_id)
+    solved = bool(is_solved_attempt)
+    coins_rewarded = 0
+
+    if solved and task_id_str not in stats["solved_task_ids"]:
+        stats["solved_task_ids"].append(task_id_str)
+        stats["solved_tasks"] = len(stats["solved_task_ids"])
+        coins_rewarded = coins_for_difficulty(task_difficulty)
+        stats["coins"] = int(stats.get("coins", 0)) + coins_rewarded
+
+    await uow.users.update_stats(user_id, stats)
+
+    stats_out = StatsOut(
+        solved=stats.get("solved_tasks", len(stats["solved_task_ids"])),
+        attempts=stats.get("attempts", 0),
+        streak_days=stats.get("streak_days", 0),
+        coins=stats.get("coins", 0),
+        solved_task_ids=list(stats["solved_task_ids"]),
+    )
+
+    return stats_out, solved, coins_rewarded

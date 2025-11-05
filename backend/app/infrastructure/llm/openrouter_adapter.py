@@ -2,7 +2,7 @@ import base64
 import json
 
 import anyio
-from typing import Sequence, Dict, Any
+from typing import Sequence, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
 from app.infrastructure.prompts.text_store import PromptTextStore
 from app.application.interfaces.llm import ILLM
@@ -24,6 +24,39 @@ class OpenRouterAdapter(ILLM):
             default_headers={"HTTP-Referer": "http://localhost:8000", "X-Title": self.s.APP_NAME},
         )
         self.prompts = PromptTextStore(base_dir="app/infrastructure/prompts")
+
+    async def _stream_chat(self, *, messages, model: str) -> AsyncGenerator[str, None]:
+        """
+        Асинхронный генератор, выдающий токены текста по мере генерации.
+        Реализовано через stream=True в openai sdk + мост через anyio.
+        """
+        send, recv = anyio.create_memory_object_stream[str](max_buffer_size=200)
+
+        def _producer():
+            stream = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+            )
+            try:
+                for ev in stream:
+                    # OpenAI совместимый формат
+                    delta: Optional[str] = None
+                    try:
+                        delta = ev.choices[0].delta.content
+                    except Exception:
+                        delta = None
+                    if delta:
+                        anyio.from_thread.run(send.send, delta)
+            finally:
+                anyio.from_thread.run(send.aclose)
+
+        # крутим продьюсер в отдельном потоке
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(anyio.to_thread.run_sync, _producer)
+            async with recv:
+                async for chunk in recv:
+                    yield chunk
 
     async def _chat(self, messages, model: str, response_format: Dict[str, Any] | None = None) -> str:
         def _do():
@@ -56,11 +89,34 @@ class OpenRouterAdapter(ILLM):
             wrap_user=[0],
             user_var="input"
         )
-        return await self._chat(messages, model=self.s.LLM_MODEL_HINT)
+        return await self._chat(messages, model=self.s.LLM_MODEL_ASSISTANT)
+    
+    async def init_teacher_mode(self, task: str) -> str:
+        '''Инициализирует режим преподавания'''
+        messages = self.prompts.build(
+            "teacher",
+            vars={'task': task}
+        )
+
+        return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)
+    
+    async def teacher_message(self, task: str, chat_history: Sequence[Dict[str, str]]) -> str:
+        messages = self.prompts.build(
+            "teacher",
+            chat_history=chat_history,
+            vars={"task": task},
+            wrap_user=[0],
+        )
+        return await self._chat(messages, model=self.s.LLM_MODEL_ASSISTANT)
 
     async def solve(self, task: str) -> str:
-        system = "You are an expert math teacher. Provide a complete step-by-step solution in Markdown."
-        return await self._chat([{"role": "system", "content": system}, {"role": "user", "content": task}], model=self.s.LLM_MODEL_SOLVE)
+        """Решает задание"""
+        messages = self.prompts.build(
+            "solver",
+            vars={'task': task},
+            wrap_user="all"
+        )
+        return await self._chat(messages, model=self.s.LLM_MODEL_SOLVE)
 
     async def image_to_text_bytes(self, image_bytes: bytes, mime: str = "image/png") -> str:
         b64 = base64.b64encode(image_bytes).decode("ascii")
@@ -73,55 +129,38 @@ class OpenRouterAdapter(ILLM):
         resp = await anyio.to_thread.run_sync(_do)
         return (resp.choices[0].message.content or "").strip()
     
-    async def grade(self, task_md: str, solution_text: str, reference: str = "") -> dict:
-        system = (
-            "Ты математический проверяющий. "
-            "Верни ТОЛЬКО JSON с ключами: summary (строка) и score (от 0 до 1, необязательный). "
-            "Не раскрывай конечный числовой ответ; дай содержательную обратную связь."
+    async def check_solution(self, task_md: str, solution_text: str) -> dict:
+        '''Проверяет решение студента и возвращает размеченное решение студента с тегами <w message="">...</w>'''
+        messages = self.prompts.build(
+            "check_solution",
+            vars={'task': task_md, 'solution': solution_text},
         )
 
-        user = (
-            f"Задача:\n{task_md}\n\n"
-            f"Решение студента (текст):\n{solution_text}\n\n"
-            f"Эталонное решение (необязательно):\n{reference}\n\n"
-            "Отметь только действительно значимые ошибки — неверные шаги рассуждений, пропущенные случаи или неверные формулы."
+        return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)
+
+    async def hint_stream(self, task: str, chat_history: Sequence[Dict[str, str]]) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build(
+            "assistant", chat_history=chat_history, vars={'task': task}, wrap_user=[0], user_var="input"
         )
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_ASSISTANT):
+            yield tok
 
-        # выберем модель для градинга: LLM_MODEL_GRADE если есть, иначе LLM_MODEL_CHECK
-        model = getattr(self.s, "LLM_MODEL_GRADE", None) or self.s.LLM_MODEL_CHECK
-        rf = {"type": "json_object"} if getattr(self.s, "STRICT_JSON", False) else None
+    async def init_teacher_mode_stream(self, task: str) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build("teacher", vars={'task': task})
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_CHECK):
+            yield tok
 
-        text = await self._chat(
-            [
-                {"role": "system", "content": system},
-                {"role": "user",  "content": user},
-            ],
-            model=model,
-            response_format=rf,
-        )
+    async def teacher_message_stream(self, task: str, chat_history: Sequence[Dict[str, str]]) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build("teacher", chat_history=chat_history, vars={"task": task}, wrap_user=[0])
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_ASSISTANT):
+            yield tok
 
-        # вытащим JSON из возможного текста вокруг
-        m = re.search(r"\{.*\}", text, re.S)
-        blob = m.group(0) if m else text
-        try:
-            data = json.loads(blob)
-        except Exception:
-            data = {"summary": text[:500]}
+    async def solve_stream(self, task: str) -> AsyncGenerator[str, None]:
+        messages = self.prompts.build("solver", vars={'task': task}, wrap_user="all")
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_SOLVE):
+            yield tok
 
-        # Если модель всё же вернула spans, аккуратно нормализуем, иначе удалим ключ.
-        raw_spans = data.get("spans")
-        if raw_spans:
-            norm_spans = []
-            for item in raw_spans:
-                if isinstance(item, dict):
-                    norm_spans.append([int(item.get("start", 0)), int(item.get("end", 0))])
-                elif isinstance(item, (list, tuple)) and len(item) >= 2:
-                    norm_spans.append([int(item[0]), int(item[1])])
-            if norm_spans:
-                data["spans"] = norm_spans
-            else:
-                data.pop("spans", None)
-        else:
-            data.pop("spans", None)
-
-        return data
+    @classmethod
+    def from_settings(cls, s: Settings) -> "OpenRouterAdapter":
+        # ВАЖНО: передаём и adapter, и settings
+        return cls(s)
