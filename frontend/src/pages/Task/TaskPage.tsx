@@ -4,6 +4,7 @@ import { api } from '@/lib/api/axios';
 import { fetchWithAuthOnce, streamText } from '@/lib/api/stream';
 import { createStreamMerger } from '@/lib/api/stream_delta';
 import { CopyButton } from '@/components/CopyButton'
+import { AnimatePresence, motion } from 'framer-motion';
 
 import Markdown from '@/components/Markdown';
 import SolveLayout from './SolveMode/SolveLayout';
@@ -17,7 +18,38 @@ import errorIcon from '@/assets/images/error.png';
 import mascotFaceWithoutPupils from '@/assets/images/mascot-face-without-pupils.png';
 import MascotEyes from "@/components/MascotEyes";
 
+import icon1 from '@/assets/images/icon-math-analysis.png';
+import icon2 from '@/assets/images/icon-linear-geometry.png';
+import icon3 from '@/assets/images/icon-probability-stat.png';
+import icon4 from '@/assets/images/icon-discrete-math.png';
+import icon5 from '@/assets/images/icon-differential-eq.png';
+import icon6 from '@/assets/images/icon-numerical.png';
+import icon7 from '@/assets/images/icon-optimization.png';
+import icon8 from '@/assets/images/icon-number-theory.png';
+import icon9 from '@/assets/images/icon-functional-analysis.png';
+import icon10 from '@/assets/images/icon-applied-math.png';
+
+const ICON_BY_THEME_ID: Record<string, string> = {
+  'мат-анализ': icon1,
+  'линал-и-геометрия': icon2,
+  'теор-вер-и-статистика': icon3,
+  'дискретная-математика': icon4,
+  'дифференциальные-уравнения': icon5,
+  'численные-методы': icon6,
+  'оптимизация': icon7,
+  'теория-чисел': icon8,
+  'функ-анализ': icon9,
+  'прикладная-математика': icon10,
+};
+
 const META_MARK = '[[META]]';
+const pane = {
+  initial: { opacity: 0, x: 24, filter: 'blur(6px)' },
+  animate: { opacity: 1, x: 0, filter: 'blur(0px)' },
+  exit:    { opacity: 0, x: -24, filter: 'blur(6px)' },
+  transition: { type: 'spring', stiffness: 400, damping: 40, mass: 0.8 },
+};
+
 
 type Difficulty = 'easy'|'medium'|'hard';
 
@@ -449,6 +481,7 @@ export default function TaskPage() {
 
   if (!task) return null;
 
+  const theme_icon = ICON_BY_THEME_ID[task.theme_id];
   const left = (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Кнопка закрытия (влево к списку задач) */}
@@ -462,9 +495,24 @@ export default function TaskPage() {
 
       {/* Табы — фиксированы сверху, контент — скроллится отдельно */}
       <div className="flex gap-2 sticky top-0 z-10">
-        <TabBtn active={leftTab === 'problem'} onClick={() => setLeftTab('problem')}>Задача</TabBtn>
-        {mode === 'solve' && <TabBtn active={leftTab === 'attempts'} onClick={() => setLeftTab('attempts')}>Мои посылки</TabBtn>}
-        <TabBtn active={leftTab === 'buy'} onClick={() => setLeftTab('buy')}>Решение</TabBtn>
+        <TabBtn active={leftTab === 'problem'} onClick={() => setLeftTab('problem')}><b>Задача</b></TabBtn>
+
+        <AnimatePresence initial={false} mode="popLayout">
+          {mode === 'solve' && (
+            <motion.div
+              key="attempts-tab"
+              layout
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+            >
+              <TabBtn active={leftTab === 'attempts'} onClick={() => setLeftTab('attempts')}><b>Мои посылки</b></TabBtn>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <TabBtn active={leftTab === 'buy'} onClick={() => setLeftTab('buy')}><b>Решение</b></TabBtn>
       </div>
 
       <div className="mt-4 flex-1 overflow-auto pr-1">
@@ -473,6 +521,11 @@ export default function TaskPage() {
             {/* Заголовок + тумблер в колонку */}
             <div className="flex flex-col gap-2 mb-4">
               <ModeSwitch mode={mode} onChange={(m) => setMode(m)} />
+              <div className="flex items-center gap-3 text-right">
+                {theme_icon && <img src={theme_icon} alt="" className="w-[80px] object-contain" />}
+                <div className="text-sm text-black">{task.theme_title}</div>
+                <div className="text-primary-900 text-xl">{starsByDifficulty(task.difficulty)}</div>
+              </div>
               <h2 className="text-2xl font-bold text-black">{task.name}</h2>
             </div>
 
@@ -514,28 +567,56 @@ export default function TaskPage() {
     />
   );
 
-  const right = mode === 'solve'
-    ? <AssistantBlock
-        messages={assistantMsgs}
-        input={assistantInput}
-        setInput={setAssistantInput}
-        onSend={sendAssistant}
-        onReset={resetAssistant}
-        loading={assistantLoading}
-      />
-    : <TeacherBlock
-        messages={teacherMsgs}
-        input={teacherInput}
-        setInput={setTeacherInput}
-        onSend={sendTeacher}
-        onReset={resetTeacher}
-        onStart={startTeacher}
-        loading={teacherLoading}
-      />;
+  const rightAnimated = (
+    <AnimatePresence mode="wait" initial={false}>
+      {mode === 'solve' ? (
+        <motion.div
+          key="solve"
+          layout
+          variants={pane}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={pane.transition}
+          className="h-full"
+        >
+          <AssistantBlock
+            messages={assistantMsgs}
+            input={assistantInput}
+            setInput={setAssistantInput}
+            onSend={sendAssistant}
+            onReset={resetAssistant}
+            loading={assistantLoading}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="teach"
+          layout
+          variants={pane}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={pane.transition}
+          className="h-full"
+        >
+          <TeacherBlock
+            messages={teacherMsgs}
+            input={teacherInput}
+            setInput={setTeacherInput}
+            onSend={sendTeacher}
+            onReset={resetTeacher}
+            onStart={startTeacher}
+            loading={teacherLoading}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   return (
     <div className="text-white">
-      <SolveLayout mode={mode} left={left} middle={middle} right={right} />
+      <SolveLayout mode={mode} left={left} middle={middle} right={rightAnimated} />
       {congrats && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white text-neutral-900 rounded-xl2 p-6 w-[420px] text-center">
@@ -561,15 +642,17 @@ export default function TaskPage() {
 
 function TabBtn({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
-    <button
+    <motion.button
+      layout
       onClick={onClick}
       className={
         'px-4 py-2 rounded-t-xl2 transition ' +
         (active ? 'bg-white text-neutral-900' : 'bg-primary-200 text-neutral-800 hover:opacity-90')
       }
+      whileTap={{ scale: 0.98 }}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
@@ -1077,3 +1160,8 @@ function PulseDot({ className = '', title = 'Генерирую…' }: { classNa
 
 const isAttemptChecking = (a: Attempt) =>
   !a.is_solved && ((a.feedback?.spans_detail?.length ?? 0) === 0);
+
+function starsByDifficulty(d: Difficulty) {
+  const s = d === 'easy' ? 1 : d === 'medium' ? 2 : 3;
+  return '★'.repeat(s) + '☆'.repeat(3 - s);
+}
