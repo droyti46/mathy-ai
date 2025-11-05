@@ -6,6 +6,7 @@ import { createStreamMerger } from '@/lib/api/stream_delta';
 import { CopyButton } from '@/components/CopyButton'
 import { AnimatePresence, motion } from 'framer-motion';
 
+import Button from '@/components/Button';
 import Markdown from '@/components/Markdown';
 import SolveLayout from './SolveMode/SolveLayout';
 
@@ -848,7 +849,7 @@ function EditorBlock({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Введите решение…"
-        className="mt-3 flex-1 rounded-xl2 border border-primary-200/60 p-3 outline-none focus:ring-2 focus:ring-primary-500"
+        className="m-1 flex-1 rounded-xl2 border border-primary-200/60 p-3 outline-none focus:ring-2 focus:ring-primary-500"
       />
 
       {/* Вертикально: зона для файла -> кнопка «Проверить» */}
@@ -1034,14 +1035,25 @@ function TeacherBlock({
 
       <div className="flex-1 min-h-0 mt-3 bg-white rounded-xl2 border border-primary-200/60 overflow-hidden">
         {messages === null ? (
-          <div className="h-full flex flex-col items-center justify-center">
-            <button
+          <div className="h-full flex flex-col items-center justify-center gap-3">
+            <MascotEyes
+              face={mascotFaceWithoutPupils}
+              leftEye={{ cxPct: 10, cyPct: 30, radiusPct: 45 }}
+              rightEye={{ cxPct: 90, cyPct: 30, radiusPct: 45 }}
+              pupilSize={30}
+              pupilColor="white"
+              className="mx-auto w-[200px] mb-6 pointer-events-none"
+            />
+            <div className="mt-3 text-center px-3">
+              Давай начнем вместе по шагам решать задачу!<br></br>Запусти режим преподавания
+            </div>
+            <Button
               onClick={onStart}
               disabled={loading}
-              className="rounded-xl2 px-6 py-3 bg-primary-500 text-white hover:bg-primary-900 transition disabled:opacity-60"
+              className="bg-primary-500"
             >
               Запустить
-            </button>
+            </Button>
           </div>
         ) : (
           <div ref={scrollRef} className="p-3 space-y-3 overflow-y-auto h-full [scrollbar-gutter:stable]">
