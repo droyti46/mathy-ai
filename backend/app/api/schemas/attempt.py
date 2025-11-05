@@ -18,14 +18,7 @@ class Feedback(BaseModel):
 class AttemptIn(BaseModel):
     task_id: str
     text: str = Field(min_length=15)
-    login: Optional[str] = None
-
-    @field_validator("text")
-    @classmethod
-    def _ensure_min_length(cls, value: str) -> str:
-        if len(value.strip()) < 15:
-            raise ValueError("Solution must be at least 15 characters long")
-        return value
+    login: Optional[str] = None 
 
 class AttemptOut(BaseModel):
     id: str

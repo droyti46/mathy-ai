@@ -85,6 +85,10 @@ export default function TaskPage() {
   // ====== Congrats modal ======
   const [congrats, setCongrats] = useState<{ coins: number } | null>(null);
 
+  // ====== Реф для актуального списка ======
+  const attemptsRef = useRef<Attempt[] | null>(null);
+  useEffect(() => { attemptsRef.current = attempts; }, [attempts]);
+
   useEffect(() => {
     (async () => {
       const { data } = await api.get<Task>(`/api/tasks/${taskId}`);
@@ -97,14 +101,82 @@ export default function TaskPage() {
     if (mode === 'teach' && leftTab === 'attempts') setLeftTab('problem');
   }, [mode, leftTab]);
 
-  // Ленивая загрузка попыток
+  // Живые попытки: initial + smart polling (+ optional SSE)
   useEffect(() => {
     if (leftTab !== 'attempts' || !taskId) return;
-    (async () => {
-      const { data } = await api.get<Attempt[]>(`/api/tasks/${taskId}/attempts`);
-      setAttempts(data);
+
+    let stopped = false;
+    let timer: number | null = null;
+    let es: EventSource | null = null;
+
+    const initial = async () => {
+      const [server, cached] = await Promise.all([
+        api.get<Attempt[]>(`/api/tasks/${taskId}/attempts`).then(r => r.data).catch(() => []),
+        Promise.resolve(loadPendingFromLS(taskId)),
+      ]);
+      setAttempts(prev => mergeAttempts(mergeAttempts(prev, cached), server));
       setSelectedAttempt(null);
-    })();
+    };
+
+    const oneTick = async () => {
+      if (stopped) return;
+      try {
+        const { data } = await api.get<Attempt[]>(`/api/tasks/${taskId}/attempts`);
+        setAttempts(prev => {
+          const merged = mergeAttempts(prev, data);
+          // обновим справа открытые детали
+          setSelectedAttempt(sel => sel ? (merged.find(a => a.id === sel.id) ?? sel) : null);
+          // поддержим локальный кэш незавершённых
+          savePendingToLS(taskId, merged);
+          return merged;
+        });
+      } finally {
+        // динамическая частота: чаще, пока есть "Проверка"
+        const hasChecking = (attemptsRef.current ?? []).some(isAttemptChecking);
+        const interval = document.hidden ? 15000 : (hasChecking ? 2000 : 10000);
+        timer = window.setTimeout(oneTick, interval);
+      }
+    };
+
+    // стартуем
+    initial().then(oneTick);
+
+    // пауза/резюм по видимости вкладки
+    const onVis = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      oneTick();
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    // --- OPTIONAL: если на бэке есть SSE с событиями по попыткам, подключаемся ---
+    // формат события: JSON Attempt в e.data
+    try {
+      es = new EventSource(`/api/tasks/${taskId}/attempts/stream`, { withCredentials: true });
+      es.onmessage = (e) => {
+        try {
+          const a: Attempt = JSON.parse(e.data);
+          setAttempts(prev => {
+            const next = mergeAttempts(prev, [a]); // мержим одну
+            setSelectedAttempt(curr => (curr && curr.id === a.id ? a : curr));
+            savePendingToLS(taskId, next);
+
+            // используем selectedAttempt из замыкания вместо несуществующего sel
+            if (a.is_solved && (selectedAttempt?.id === a.id || (prev ?? []).some(x => x.id === a.id))) {
+              setCongrats({ coins: a.coins_rewarded ?? 0 });
+            }
+            return next;
+          });
+        } catch {}
+      };
+      es.onerror = () => { es?.close(); es = null; }; // silently fallback на polling
+    } catch { /* нет SSE — и ок */ }
+
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      if (es) es.close();
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [leftTab, taskId]);
 
   // ====== Helpers ======
@@ -119,6 +191,45 @@ export default function TaskPage() {
       return iso;
     }
   };
+
+  // --- attempts utils ---
+  function mergeAttempts(prev: Attempt[] | null, incoming: Attempt[]) {
+    // incoming — источник истины; но "висящие" из prev не теряем
+    const byId = new Map<string, Attempt>();
+    incoming.forEach(a => byId.set(a.id, a));
+    (prev ?? []).forEach(a => {
+      if (!byId.has(a.id) && isAttemptChecking(a)) byId.set(a.id, a);
+    });
+    return [...byId.values()].sort(
+      (a, b) => +new Date(b.created_at) - +new Date(a.created_at)
+    );
+  }
+
+  // --- pending cache in localStorage (чтобы "Проверка" не пропадала после reload) ---
+  function pendingKey(taskId: string) { return `attempts-pending-${taskId}`; }
+  const PENDING_TTL_MS = 10 * 60 * 1000; // 10 минут
+
+  function loadPendingFromLS(taskId: string): Attempt[] {
+    try {
+      const raw = localStorage.getItem(pendingKey(taskId));
+      if (!raw) return [];
+      const now = Date.now();
+      const arr = JSON.parse(raw) as (Attempt & { _cached_at?: number })[];
+      return arr.filter(a =>
+        isAttemptChecking(a) && (!a._cached_at || now - a._cached_at < PENDING_TTL_MS)
+      ).map(({ _cached_at, ...a }) => a);
+    } catch { return []; }
+  }
+
+  function savePendingToLS(taskId: string, list: Attempt[]) {
+    try {
+      const toSave = list
+        .filter(isAttemptChecking)
+        .map(a => ({ ...a, _cached_at: Date.now() }));
+      if (toSave.length) localStorage.setItem(pendingKey(taskId), JSON.stringify(toSave));
+      else localStorage.removeItem(pendingKey(taskId));
+    } catch {}
+  }
 
   // ====== Buy solution ======
   const [buyLoading, setBuyLoading] = useState(false);
@@ -492,7 +603,7 @@ function AttemptsBlock({
   formatDate: (iso: string) => string;
 }) {
   if (!attempts) return <div className="opacity-90">Загрузка попыток…</div>;
-  if (attempts.length === 0) return <div className="opacity-90">Вы ещё не отправляли решение.</div>;
+  if (attempts.length === 0) return <div className="opacity-90 text-black">Вы ещё не отправляли решение.</div>;
 
   if (selected) return <AttemptDetails attempt={selected} onBack={onBackToList} />;
 
@@ -929,7 +1040,7 @@ function highlightPieces(text: string, spans: Span[]) {
   return res;
 }
 
-/* ---------- хелпер: авто-рост textarea до N строк ---------- */
+/* ---------- хелперы ---------- */
 function useAutoGrowTextarea(
   ref: React.RefObject<HTMLTextAreaElement>,
   value: string,
@@ -963,3 +1074,6 @@ function PulseDot({ className = '', title = 'Генерирую…' }: { classNa
     />
   );
 }
+
+const isAttemptChecking = (a: Attempt) =>
+  !a.is_solved && ((a.feedback?.spans_detail?.length ?? 0) === 0);
