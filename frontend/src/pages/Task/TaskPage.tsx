@@ -726,7 +726,7 @@ function VerdictBadge({ attempt }: { attempt: Attempt }) {
   const isChecking = !attempt.is_solved && (attempt.feedback?.spans_detail?.length ?? 0) === 0;
   if (isChecking) return <span className="inline-block px-3 py-1 rounded-full bg-blue-500 text-white">Проверка</span>;
   if (attempt.is_solved) return <span className="inline-block px-3 py-1 rounded-full bg-green-600 text-white">OK</span>;
-  return <span className="inline-block px-3 py-1 rounded-full bg-red-600 text-white">Ошибка решения</span>;
+  return <span className="opacity-80 inline-block px-3 py-1 rounded-full bg-red-600 text-white">Ошибка решения</span>;
 }
 
 function AttemptDetails({ attempt, onBack }: { attempt: Attempt; onBack: () => void }) {
