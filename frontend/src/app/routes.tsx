@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import WelcomePage from '@/pages/Welcome/WelcomePage';
 import AuthPage from '@/pages/Auth/AuthPage';
 import MainPage from '@/pages/Main/MainPage';
+import TheoryLessonPage from '@/pages/Main/TheoryLessonPage';
 import ProtectedRoute from './ProtectedRoute';
 
 // новые вкладки и страница-заглушка задачи
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="tasks" replace /> },
+      { path: 'theory/:themeId/:lessonId', element: <TheoryLessonPage /> },
       { path: 'theory', element: <TheoryTab /> },
       { path: 'tasks', element: <TasksTab /> },     // вкладка по умолчанию
       { path: 'daily', element: <DailyTab /> },
