@@ -1,6 +1,7 @@
 from app.settings import get_settings
 from app.infrastructure.llm.openrouter_adapter import OpenRouterAdapter
 from app.infrastructure.pandas_repo.tasks_repo_pandas import PandasTaskRepo
+from app.infrastructure.pandas_repo.theory_repo_pandas import PandasTheoryRepo
 from app.infrastructure.db.base import create_engine_and_session, init_models
 from app.infrastructure.db.uow_sqlalchemy import SqlUoW
 from app.infrastructure.ocr.vision_openrouter import VisionOCROpenRouter
@@ -11,7 +12,8 @@ def build_container():
     s = get_settings()
     engine, session_factory = create_engine_and_session(s.DATABASE_URL)
     tasks_repo = PandasTaskRepo(s.DATA_PATH)
-    uow = SqlUoW(session_factory=session_factory, tasks_repo=tasks_repo)
+    theory_repo = PandasTheoryRepo(s.THEORY_PATH)
+    uow = SqlUoW(session_factory=session_factory, tasks_repo=tasks_repo, theory_repo=theory_repo)
     llm = OpenRouterAdapter.from_settings(s)
     ocr_model = s.OCR_MODEL.strip().strip('"')
     ocr = VisionOCROpenRouter(

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # Пути
     DATA_PATH: Path = Field(default=Path("data/tasks.csv"))
+    THEORY_PATH: Path = Field(default=Path("data/theory.csv"))
     STORAGE_DIR: Path = Field(default=Path("var/storage"))
 
     # БД
