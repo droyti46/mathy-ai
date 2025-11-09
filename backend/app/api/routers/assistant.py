@@ -14,7 +14,6 @@ async def request_hint(task_id: str, payload: ChatRequest, uow=Depends(get_uow),
     text = await llm.hint(task.statement_md, [m.model_dump() for m in payload.messages])
     return ChatOut(messages=[ChatMessage(role="assistant", content=text)])
 
-# НОВОЕ: стрим
 @router.post("/{task_id}/assistant/stream")
 async def request_hint_stream(task_id: str, payload: ChatRequest, uow=Depends(get_uow), llm=Depends(get_llm)):
     task = await uow.tasks.get(task_id)
