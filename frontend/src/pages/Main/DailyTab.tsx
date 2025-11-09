@@ -103,7 +103,7 @@ export default function DailyTab() {
     <div className="text-white">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Ежедневная задача</h1>
+          <h3 className="text-2xl font-extrabold tracking-tight">Ежедневная задача</h3>
           <p className="mt-1 opacity-80 text-sm md:text-base">
             Обновляется каждый день в 00:00. До следующей: <b className="opacity-95">{timeLeft}</b>
           </p>
