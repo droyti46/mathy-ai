@@ -5,7 +5,7 @@ export default function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       className={
-        'rounded-xl2 px-6 py-3 font-semibold bg-primary-900 text-white hover:scale-105 transition ' +
+        'rounded-xl2 px-6 py-3 font-semibold text-white hover:scale-105 transition ' +
         className
       }
       {...rest}

@@ -50,7 +50,7 @@ export default function WelcomePage() {
           <h1 className="text-4xl md:text-6xl font-extrabold">тренажёр</h1>
           <p className="mt-6 opacity-90">Решение математических задач с автоматической проверкой от ИИ</p>
           <div className="mt-8">
-            <Button onClick={() => navigate('/auth?tab=register')}>Попробовать</Button>
+            <Button className="bg-primary-900" onClick={() => navigate('/auth?tab=register')}>Попробовать</Button>
           </div>
         </div>
       </header>
@@ -149,7 +149,7 @@ export default function WelcomePage() {
         />
         <h3 className="text-2xl md:text-3xl font-bold">Прокачайте свой математический<br></br>скилл с утёнком Мати!</h3>
         <div className="mt-6 flex gap-4 justify-center">
-          <Button onClick={() => navigate('/auth?tab=register')}>Зарегистрироваться</Button>
+          <Button className='bg-primary-900' onClick={() => navigate('/auth?tab=register')}>Зарегистрироваться</Button>
           <button
             onClick={() => navigate('/auth?tab=login')}
             className="rounded-xl2 px-6 py-3 font-semibold border-2 border-primary-500 text-primary-900 bg-white hover:bg-primary-200 transition"
