@@ -12,6 +12,7 @@ import re
 class TheoryId:
     theme_id: str
     lesson_id: str
+    theme_title: str
 
 
 @dataclass
@@ -45,7 +46,11 @@ class PandasTheoryRepo:
     def list_all_ids(self) -> List[TheoryId]:
         """Список всех пар (theme_id, lesson_id) для фронта."""
         return [
-            TheoryId(theme_id=row["theme_id"], lesson_id=row["lesson_id"])
+            TheoryId(
+                theme_id=row["theme_id"],
+                lesson_id=row["lesson_id"],
+                theme_title=row["section"],  # ← берём из колонки «Раздел»
+            )
             for _, row in self._df.iterrows()
         ]
 

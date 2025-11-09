@@ -3,7 +3,6 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
-# ---- то, что ты прислал как пример ----
 class LessonOut(BaseModel):
     id: str
     title: str
@@ -20,15 +19,15 @@ class ThemeOut(BaseModel):
     lessons: List[LessonOut] = Field(default_factory=list)
 
 
-# ---- вывода теоретического урока ----
 class TheoryContentOut(BaseModel):
     theme_id: str
+    theme_title: str
     lesson_id: str
     title: str
     content_md: str
 
 
-# ---- плоские айдишники для фронта ----
 class TheoryIdPair(BaseModel):
     theme_id: str
     lesson_id: str
+    theme_title: str
