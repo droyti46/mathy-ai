@@ -218,11 +218,6 @@ export default function TheoryTab() {
                           <div className="mt-2 text-xs text-neutral-600">
                             Урок {lesson.id.padStart(3, '0')}
                           </div>
-                          {lesson.tasks_count != null && (
-                            <div className="mt-3 text-sm text-neutral-600">
-                              Задач по теме: {lesson.tasks_count}
-                            </div>
-                          )}
                         </button>
                       ))}
                     </div>
