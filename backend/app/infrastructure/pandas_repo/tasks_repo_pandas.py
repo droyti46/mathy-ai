@@ -234,6 +234,123 @@ class PandasTaskRepo:
 
         self.df["_lesson_slug"] = self.df.apply(to_lesson_slug, axis=1)
 
+    # --- SEARCH HELPERS ---
+
+    @staticmethod
+    def _normalize_text(s: str) -> str:
+        """
+        Простая нормализация под поиск: нижний регистр, ё->е, убираем лишние символы,
+        схлопываем пробелы.
+        """
+        s = (s or "").lower()
+        s = s.replace("ё", "е")
+        # разрешаем буквы/цифры/пробелы, остальное -> пробел
+        s = re.sub(r"[^0-9a-zа-я\s]", " ", s, flags=re.IGNORECASE)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+
+    @staticmethod
+    def _extract_query_terms(q: str) -> tuple[list[str], list[str]]:
+        """
+        Возвращает (tokens, phrases). Фразы — в двойных кавычках "..." или «...».
+        Остальное — токены по пробелам.
+        """
+        if not q:
+            return [], []
+        # фразы в кавычках
+        phrase_matches = re.findall(r'"([^"]+)"|«([^»]+)»', q)
+        phrases = [m[0] or m[1] for m in phrase_matches]
+        # убираем фразы из строки, чтобы не удвоить токены
+        q_wo_phrases = re.sub(r'"[^"]+"|«[^»]+»', " ", q)
+        tokens = [t for t in re.split(r"\s+", q_wo_phrases) if t]
+        # нормализуем
+        phrases = [PandasTaskRepo._normalize_text(p) for p in phrases if p.strip()]
+        tokens = [PandasTaskRepo._normalize_text(t) for t in tokens if t.strip()]
+        return tokens, phrases
+
+    @staticmethod
+    def _levenshtein_within(a: str, b: str, k: int = 1) -> bool:
+        """
+        Проверка расстояния Левенштейна <= k (по умолчанию 1) с ранним выходом.
+        Оптимизировано узкой диагональной полосой (Ukkonen).
+        """
+        # быстрый отсев по длинам
+        la, lb = len(a), len(b)
+        if abs(la - lb) > k:
+            return False
+        # гарантируем a короче
+        if la > lb:
+            a, b = b, a
+            la, lb = lb, la
+
+        prev = list(range(la + 1))
+        for j in range(1, lb + 1):
+            bj = b[j - 1]
+            start = max(1, j - k)
+            end = min(la, j + k)
+            cur = [0] * (la + 1)
+            cur[0] = j
+            # вне полосы — заполняем значениями > k, чтобы отсеять
+            for i in range(1, start):
+                cur[i] = k + 1
+            for i in range(start, end + 1):
+                cost = 0 if a[i - 1] == bj else 1
+                cur[i] = min(
+                    prev[i] + 1,       # удаление
+                    cur[i - 1] + 1,    # вставка
+                    prev[i - 1] + cost # замена/совпадение
+                )
+            for i in range(end + 1, la + 1):
+                cur[i] = k + 1
+            if min(cur) > k:
+                return False
+            prev = cur
+        return prev[la] <= k
+
+    def _score_text_for_query(self, text_norm: str, tokens: list[str], phrases: list[str]) -> int:
+        """
+        Вычисляет простой скоринг совпадений:
+        +5 за каждую найденную фразу,
+        +2 за точное вхождение токена,
+        +1 за "почти-совпадение" (Левенштейн<=1 или подстрока для токенов >=4).
+        """
+        if not text_norm:
+            return 0
+        score = 0
+        words = set(text_norm.split())
+
+        # фразы с большим весом
+        for ph in phrases:
+            if ph and ph in text_norm:
+                score += 5 * max(1, ph.count(" ") + 1)
+
+        for t in tokens:
+            if not t:
+                continue
+            if t in words or t in text_norm:
+                score += 2
+                continue
+            # “мягкий” матч: опечатки и частичные совпадения
+            near = False
+            if len(t) >= 4:
+                # подстрочное (для длинных токенов)
+                for w in words:
+                    if t in w or w in t:
+                        near = True
+                        break
+            if not near:
+                # Левенштейн<=1 на любое слово
+                for w in words:
+                    if self._levenshtein_within(t, w, k=1):
+                        near = True
+                        break
+            if near:
+                score += 1
+
+        return score
+    
+    # --- OTHER HELPERS ---
+
     def _resolve_theme_key(self, theme_id: str | None) -> Optional[str]:
         if theme_id is None:
             return None
@@ -438,8 +555,24 @@ class PandasTaskRepo:
                 ]
 
         if q:
-            ql = q.lower()
-            df = df[df["statement_md"].str.lower().str.contains(ql, na=False)]
+            tokens, phrases = self._extract_query_terms(q)
+
+            # Собираем поле для поиска: name + statement_md (+ можно добавить tags/source)
+            search_series = (
+                df.get("name", "").astype(str) + " " +
+                df.get("statement_md", "").astype(str)
+                # + " " + df.get("tags", "").astype(str)
+                # + " " + df.get("source", "").astype(str)
+            )
+
+            # Нормализуем один раз
+            search_norm = search_series.map(self._normalize_text)
+
+            # Считаем скоринг
+            scores = search_norm.map(lambda txt: self._score_text_for_query(txt, tokens, phrases))
+
+            # Оставляем только релевантные и сортируем по убыванию очков
+            df = df.loc[scores > 0].assign(_score=scores[scores > 0]).sort_values("_score", ascending=False)
 
         if exclude_solved_by_user_id and attempts_repo:
             solved_task_ids = set()
@@ -519,6 +652,7 @@ class PandasTaskRepo:
             )
             return {"date": str(today), "task": empty_task}
         idx = int(today.strftime("%Y%m%d")) % len(self.df)
+        print(idx)
         r = self.df.iloc[idx]
         t = self._row_to_task(r)
         return {"date": str(today), "task": t}

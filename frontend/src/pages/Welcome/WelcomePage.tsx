@@ -158,23 +158,71 @@ export default function WelcomePage() {
           </button>
         </div>
       </section>
-
-      {/* FOOTER (упрощённая версия из макета) */}
+      
+      {/* FOOTER */}
       <footer className="bg-primary-500 text-white py-20">
         <div className="container mx-auto max-w-6xl px-6 grid md:grid-cols-3 gap-8">
           <div>
-            <div className="text-2xl font-bold">Мати</div>
+            {/* Можно сделать логотипом/ссылкой на главную */}
+            <Link to="/" className="inline-block text-2xl font-bold hover:opacity-90 transition">
+              Мати
+            </Link>
           </div>
+
           <div>
             <div className="text-xl font-semibold">О нас</div>
-            <div className="opacity-90 mt-2">О мати<br/>Наша команда</div>
+            <ul className="opacity-90 mt-2 space-y-1">
+              <li>
+                <Link
+                  to="/about/maty"
+                  className="hover:underline underline-offset-4 decoration-white/70 transition-colors"
+                >
+                  О мати
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/about/team"
+                  className="hover:underline underline-offset-4 decoration-white/70 transition-colors"
+                >
+                  Наша команда
+                </Link>
+              </li>
+            </ul>
           </div>
+
           <div>
             <div className="text-xl font-semibold">Авторизация</div>
-            <div className="opacity-90 mt-2">Вход<br/>Регистрация</div>
+            <ul className="opacity-90 mt-2 space-y-1">
+              <li>
+                <Link
+                  to="/auth?tab=login"
+                  className="hover:underline underline-offset-4 decoration-white/70 transition-colors"
+                >
+                  Вход
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/auth?tab=register"
+                  className="hover:underline underline-offset-4 decoration-white/70 transition-colors"
+                >
+                  Регистрация
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
-        <div className="container mx-auto max-w-6xl px-6 mt-8 text-sm opacity-90">Terms of service · Privacy policy</div>
+
+        <div className="container mx-auto max-w-6xl px-6 mt-8 text-sm opacity-90">
+          <Link to="/terms" className="hover:underline underline-offset-4 decoration-white/70">
+            Terms of service
+          </Link>
+          {" · "}
+          <Link to="/privacy" className="hover:underline underline-offset-4 decoration-white/70">
+            Privacy policy
+          </Link>
+        </div>
       </footer>
     </div>
   );

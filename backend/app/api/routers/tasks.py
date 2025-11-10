@@ -11,6 +11,11 @@ def _split_csv(value: Optional[str]) -> list[str]:
         return []
     return [x.strip() for x in value.split(",") if x.strip()]
 
+@router.get("/daily", response_model=DailyTaskOut)
+async def daily_task(uow = Depends(get_uow)):
+    t = await uow.tasks.daily_task()
+    return DailyTaskOut(date=t["date"], task=TaskOut(**t["task"].__dict__))
+
 @router.get("", response_model=list[TaskOut])
 async def list_tasks(
     theme_id: Optional[str] = None,
@@ -56,8 +61,3 @@ async def get_task(task_id: str, uow = Depends(get_uow)):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return TaskOut(**task.__dict__)
-
-@router.get("/daily", response_model=DailyTaskOut)
-async def daily_task(uow = Depends(get_uow)):
-    t = await uow.tasks.daily_task()
-    return DailyTaskOut(date=t["date"], task=TaskOut(**t["task"].__dict__))

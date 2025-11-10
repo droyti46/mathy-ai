@@ -2,11 +2,12 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from app.infrastructure.db.repositories_sqlalchemy import SqlAttemptRepo, SqlUserRepo
 
 class SqlUoW:
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], tasks_repo):
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession], tasks_repo, theory_repo):
         self.session: AsyncSession = session_factory()
         self.attempts = SqlAttemptRepo(self.session)
         self.users = SqlUserRepo(self.session)
         self.tasks = tasks_repo
+        self.theory = theory_repo
 
     async def __aenter__(self):
         return self
