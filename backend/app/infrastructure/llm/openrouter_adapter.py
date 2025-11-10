@@ -6,7 +6,7 @@ from typing import Sequence, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
 from app.infrastructure.prompts.text_store import PromptTextStore
 from app.application.interfaces.llm import ILLM
-from app.settings import Settings
+from app.settings import Settings 
 import re
 
 def _safe_json(s: str) -> Dict[str, Any]:
@@ -18,14 +18,10 @@ def _safe_json(s: str) -> Dict[str, Any]:
 class OpenRouterAdapter(ILLM):
     def __init__(self, settings: Settings):
         self.s = settings
-        self.openrouter_client = OpenAI(
+        self.client = OpenAI(
             base_url=self.s.OPENROUTER_BASE_URL,
             api_key=self.s.OPENROUTER_API_KEY,
             default_headers={"HTTP-Referer": "http://localhost:8000", "X-Title": self.s.APP_NAME},
-        )
-        self.nscale_client = OpenAI(
-            base_url=self.s.NSCALE_BASE_URL,
-            api_key=self.s.NSCALE_SERVICE_TOKEN,
         )
         self.prompts = PromptTextStore(base_dir="app/infrastructure/prompts")
 
@@ -37,7 +33,7 @@ class OpenRouterAdapter(ILLM):
         send, recv = anyio.create_memory_object_stream[str](max_buffer_size=200)
 
         def _producer():
-            stream = self.openrouter_client.chat.completions.create(
+            stream = self.client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=True,
@@ -62,20 +58,12 @@ class OpenRouterAdapter(ILLM):
                 async for chunk in recv:
                     yield chunk
 
-    async def _chat(
-        self,
-        messages,
-        model: str,
-        response_format: Dict[str, Any] | None = None,
-        *,
-        use_nscale: bool = False,
-    ) -> str:
+    async def _chat(self, messages, model: str, response_format: Dict[str, Any] | None = None) -> str:
         def _do():
             kwargs: Dict[str, Any] = {}
             if response_format:
                 kwargs["response_format"] = response_format
-            client = self.nscale_client if use_nscale else self.openrouter_client
-            return client.chat.completions.create(model=model, messages=messages, **kwargs)
+            return self.client.chat.completions.create(model=model, messages=messages, **kwargs)
         resp = await anyio.to_thread.run_sync(_do)
         return resp.choices[0].message.content or ""
 
@@ -89,8 +77,7 @@ class OpenRouterAdapter(ILLM):
         rf = {"type": "json_object"} if self.s.STRICT_JSON else None
         out = await self._chat(
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            model=self.s.LLM_MODEL_CHECK,
-            response_format=rf,
+            model=self.s.LLM_MODEL_CHECK, response_format=rf,
         )
         return _safe_json(out)
 
@@ -129,7 +116,7 @@ class OpenRouterAdapter(ILLM):
             vars={'task': task},
             wrap_user="all"
         )
-        return await self._chat(messages, model=self.s.NSCALE_MODEL_SOLVE, use_nscale=True)
+        return await self._chat(messages, model=self.s.LLM_MODEL_SOLVE)
 
     async def image_to_text_bytes(self, image_bytes: bytes, mime: str = "image/png") -> str:
         b64 = base64.b64encode(image_bytes).decode("ascii")
@@ -138,9 +125,7 @@ class OpenRouterAdapter(ILLM):
             {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
         ]
         def _do():
-            return self.openrouter_client.chat.completions.create(
-                model=self.s.LLM_MODEL_VISION, messages=[{"role": "user", "content": content}]
-            )
+            return self.client.chat.completions.create(model=self.s.LLM_MODEL_VISION, messages=[{"role": "user", "content": content}])
         resp = await anyio.to_thread.run_sync(_do)
         return (resp.choices[0].message.content or "").strip()
     
@@ -151,7 +136,7 @@ class OpenRouterAdapter(ILLM):
             vars={'task': task_md, 'solution': solution_text},
         )
 
-        return await self._chat(messages, model=self.s.NSCALE_MODEL_CHECK, use_nscale=True)
+        return await self._chat(messages, model=self.s.LLM_MODEL_CHECK)
 
     async def hint_stream(self, task: str, chat_history: Sequence[Dict[str, str]]) -> AsyncGenerator[str, None]:
         messages = self.prompts.build(
@@ -172,8 +157,8 @@ class OpenRouterAdapter(ILLM):
 
     async def solve_stream(self, task: str) -> AsyncGenerator[str, None]:
         messages = self.prompts.build("solver", vars={'task': task}, wrap_user="all")
-        result = await self._chat(messages, model=self.s.NSCALE_MODEL_SOLVE, use_nscale=True)
-        yield result
+        async for tok in self._stream_chat(messages=messages, model=self.s.LLM_MODEL_SOLVE):
+            yield tok
 
     @classmethod
     def from_settings(cls, s: Settings) -> "OpenRouterAdapter":
