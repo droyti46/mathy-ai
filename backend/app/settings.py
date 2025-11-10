@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     LLM_MODEL_SOLVE: str = Field(default="google/gemini-2.5-flash")
     LLM_MODEL_VISION: str = Field(default="google/gemini-2.5-flash")
     OCR_MODEL: str = Field(default="google/gemini-2.5-flash")
+
+    NSCALE_SERVICE_TOKEN: str = Field(..., min_length=1)
+    NSCALE_BASE_URL: str = Field(default="https://inference.api.nscale.com/v1")
+    NSCALE_MODEL_CHECK: str = Field(default="qwen/qwen-3-4b-thinking-2507")
+    NSCALE_MODEL_SOLVE: str = Field(default="qwen/qwen-3-4b-thinking-2507")
     STRICT_JSON: bool = Field(default=True)
 
     # Auth / JWT

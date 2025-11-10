@@ -4,12 +4,13 @@
 - Все нужные `__init__.py` добавлены → импорты стабильно работают на Windows / Python 3.13.
 - LLM-адаптер без многострочных строк; только обычные кавычки + `\n`.
 - Персистентность (SQLite) + авторизация + попытки + OCR через OpenRouter.
+- Разметка решений и полный solve выполняются через Qwen3-4B-Thinking-2507 по NScale API.
 
 ## Установка (Windows PowerShell)
 ```powershell
 poetry install
 Copy-Item .env.example .env
-notepad .env   # впишите OPENROUTER_API_KEY=sk-or-...
+notepad .env   # впишите OPENROUTER_API_KEY=sk-or-... и NSCALE_SERVICE_TOKEN=...
 poetry run uvicorn app.main:app --reload --port 8000
 # затем откройте http://127.0.0.1:8000/docs
 ```
@@ -33,9 +34,13 @@ Get-ChildItem -Recurse -Include *.pyc | Remove-Item -Force -ErrorAction Silently
 - `OPENROUTER_API_KEY=...`
 - `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`
 - `LLM_MODEL_CHECK=openai/gpt-4o-mini`
-- `LLM_MODEL_HINT=openai/gpt-4o-mini`
+- `LLM_MODEL_ASSISTANT=openai/gpt-4o-mini`
 - `LLM_MODEL_SOLVE=anthropic/claude-3.5-sonnet`
 - `LLM_MODEL_VISION=openai/gpt-4o-mini`
+- `NSCALE_SERVICE_TOKEN=...`
+- `NSCALE_BASE_URL=https://inference.api.nscale.com/v1`
+- `NSCALE_MODEL_CHECK=qwen/qwen-3-4b-thinking-2507`
+- `NSCALE_MODEL_SOLVE=qwen/qwen-3-4b-thinking-2507`
 - `STRICT_JSON=true`
 - `TEACHER_MODE=true`
 - `DATA_PATH=data/tasks.csv`
