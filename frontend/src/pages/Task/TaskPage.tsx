@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { api } from '@/lib/api/axios';
 import { fetchWithAuthOnce, streamText } from '@/lib/api/stream';
 import { createStreamMerger } from '@/lib/api/stream_delta';
@@ -748,32 +749,56 @@ function AttemptDetails({ attempt, onBack }: { attempt: Attempt; onBack: () => v
 
 /** Хайлайт с «умным» тултипом: если места снизу нет — показываем сверху. */
 function Highlight({ text, message }: { text: string; message?: string }) {
-  const ref = useRef<HTMLSpanElement | null>(null);
+  const [show, setShow] = useState(false);
+  const posRef = useRef({ x: 0, y: 0 });
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
   const [placeTop, setPlaceTop] = useState(false);
 
-  function onEnter() {
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    const needTop = r.bottom + 40 > window.innerHeight; // 40 — примерная высота подсказки
-    setPlaceTop(needTop);
+  // mousemove без лишних ре-рендеров: бутылочное горлышко через rAF
+  function onMove(e: React.MouseEvent) {
+    posRef.current = { x: e.clientX, y: e.clientY };
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const { x, y } = posRef.current;
+        // отступы от курсора
+        const offX = 14;
+        const offY = 18;
+        const nx = Math.min(x + offX, window.innerWidth - 8); // 8px паддинг у края
+        const ny = y + offY;
+        setPos({ x: nx, y: ny });
+        setPlaceTop(y + 120 > window.innerHeight); // если у низа мало места — вверх
+      });
+    }
   }
+
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
 
   return (
     <span
-      ref={ref}
-      onMouseEnter={onEnter}
-      className="relative underline decoration-wavy decoration-red-500 cursor-text group"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onMouseMove={onMove}
+      className="relative underline decoration-wavy decoration-red-500 cursor-text"
     >
       {text}
-      {message && (
-        <span
-          className={
-            'absolute left-0 z-10 hidden group-hover:block bg-black text-white text-sm rounded px-2 py-1 max-w-[320px] pointer-events-none ' +
-            (placeTop ? 'bottom-full -mb-1' : 'top-full mt-1')
-          }
+
+      {message && show && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={{
+            left: pos.x,
+            top: placeTop ? undefined : pos.y,
+            bottom: placeTop ? (window.innerHeight - pos.y) : undefined,
+          }}
         >
-          {message}
-        </span>
+          <div className="bg-black text-white text-sm rounded px-3 py-1
+                          max-w-[min(80vw,640px)] whitespace-pre-wrap break-words shadow-lg">
+            {message}
+          </div>
+        </div>,
+        document.body
       )}
     </span>
   );

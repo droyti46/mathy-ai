@@ -63,16 +63,31 @@ npm install
 ```
 
 Скопируйте .env.example
-```bash
+```powershell
 Copy-Item .env.example .env
 ```
 
 Запустите dev-сервер
 ```bash
-npm run dev
+npm run dev -- --host --port 3000
+```
+
+Если возникнет ошибка, попробуйте ввести команду
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 ```
 
 Готово! Рабочий сервис находится по адресу
 ```
-http://localhost:5173
+http://localhost:3000
+```
+
+Если ничего не открывается, попробуйте открыть один из `Network` адресов (в консоли будет):
+
+```bash
+VITE v5.4.21  ready in 7223 ms
+
+➜  Local:   http://localhost:3000/
+➜  Network: http://XXX.XXX.XXX.XXX:3000/
+➜  Network: http://XXX.XXX.XXX.XXX:3000/
 ```
