@@ -28,7 +28,7 @@ cd backend
 poetry install
 ```
 
-Скопируйте .env.example
+Скопируйте .env.example и вставьте в него свой `OPENROUTER_API_KEY`
 ```bash
 Copy-Item .env.example .env
 ```

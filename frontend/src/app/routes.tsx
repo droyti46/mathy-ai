@@ -11,9 +11,20 @@ import TheoryTab from '@/pages/Main/TheoryTab';
 import DailyTab from '@/pages/Main/DailyTab';
 import TaskPage from '@/pages/Task/TaskPage';
 
+import AboutPage from "@/pages/Static/AboutPage";
+import AboutMatyPage from "@/pages/Static/AboutMatyPage";
+import TeamPage from "@/pages/Static/TeamPage";
+import TermsPage from "@/pages/Static/TermsPage";
+import PrivacyPage from "@/pages/Static/PrivacyPage";
+
 export const router = createBrowserRouter([
   { path: '/', element: <WelcomePage /> },
   { path: '/auth', element: <AuthPage /> },
+  { path: "/about", element: <AboutPage /> },
+  { path: "/about/maty", element: <AboutMatyPage /> },
+  { path: "/about/team", element: <TeamPage /> },
+  { path: "/terms", element: <TermsPage /> },
+  { path: "/privacy", element: <PrivacyPage /> },
   {
     path: '/app',
     element: (

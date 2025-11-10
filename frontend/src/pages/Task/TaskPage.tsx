@@ -111,12 +111,16 @@ export default function TaskPage() {
   const [assistantLoading, setAssistantLoading] = useState(false);
 
   // ====== Teacher (teach) ======
-  const [teacherMsgs, setTeacherMsgs] = useState<ChatMessage[] | null>(null);
+  const [teacherMsgs, setTeacherMsgs] = useState<ChatMessage[]>([]);
+  const [teacherStarted, setTeacherStarted] = useState(false);
   const [teacherInput, setTeacherInput] = useState('');
   const [teacherLoading, setTeacherLoading] = useState(false);
 
   // ====== Congrats modal ======
   const [congrats, setCongrats] = useState<{ coins: number } | null>(null);
+
+  // ====== Реф для блокировки учителя ======
+  const teacherLockRef = useRef(false);
 
   // ====== Реф для актуального списка ======
   const attemptsRef = useRef<Attempt[] | null>(null);
@@ -383,20 +387,79 @@ export default function TaskPage() {
 
   // ====== Teacher chat ======
   const startTeacher = async () => {
-    if (teacherLoading) return;
+    if (teacherLockRef.current || teacherLoading) return;
+    teacherLockRef.current = true;
+
     setTeacherLoading(true);
-    setTeacherMsgs([{ role: 'assistant', content: '' }]); // плейсхолдер
+    setTeacherStarted(true);
+    // создаём плейсхолдер гарантированно (массив уже есть)
+    setTeacherMsgs([{ role: 'assistant', content: '' }]);
 
     try {
       await streamText(
         `/api/tasks/${taskId}/teacher/init/stream`,
         {},
         (chunk) => {
-          setTeacherMsgs(prev => {
-            const copy = prev.slice();
-            copy[0] = { role: 'assistant', content: (copy[0].content || '') + chunk };
-            return copy;
+          // безопасно: не используем prev.slice() вообще
+          setTeacherMsgs(curr => {
+            const first = curr[0]?.content ?? '';
+            const next = [...curr];
+            next[0] = { role: 'assistant', content: first + chunk };
+            return next;
           });
+        },
+        {
+          onDone: () => { setTeacherLoading(false); teacherLockRef.current = false; },
+          onError: () => { setTeacherLoading(false); teacherLockRef.current = false; },
+        }
+      );
+    } catch {
+      setTeacherLoading(false);
+      teacherLockRef.current = false;
+    }
+  };
+
+  const sendTeacher = async () => {
+    if (!teacherStarted || teacherLoading) return;
+    const content = teacherInput.trim();
+    if (!content) return;
+
+    // добавляем сообщение пользователя без предположений о prev
+    setTeacherMsgs(curr => [...curr, { role: 'user', content }]);
+    setTeacherInput('');
+    setTeacherLoading(true);
+
+    // плейсхолдер ответа
+    setTeacherMsgs(curr => [...curr, { role: 'assistant', content: '' }]);
+
+    const merge = createStreamMerger('');
+    try {
+      await streamText(
+        `/api/tasks/${taskId}/teacher/stream`,
+        { messages: [...teacherMsgs, { role: 'user', content }] }, // можно также читать из ref
+        (rawChunk) => {
+          const idx = rawChunk.indexOf(META_MARK);
+          const piece = idx >= 0 ? rawChunk.slice(0, idx) : rawChunk;
+          const full = merge.push(piece);
+
+          setTeacherMsgs(curr => {
+            if (!curr.length) return [{ role: 'assistant', content: full }];
+            const next = [...curr];
+            const last = next[next.length - 1];
+            next[next.length - 1] =
+              last?.role === 'assistant' ? { ...last, content: full } : last;
+            return next;
+          });
+
+          if (idx >= 0) {
+            const metaRaw = rawChunk.slice(idx + META_MARK.length).trim();
+            try {
+              const meta = JSON.parse(metaRaw);
+              if (meta?.type === 'teacher_meta' && meta?.is_solved && meta?.coins_rewarded > 0) {
+                setCongrats({ coins: meta.coins_rewarded });
+              }
+            } catch {}
+          }
         },
         { onDone: () => setTeacherLoading(false), onError: () => setTeacherLoading(false) }
       );
@@ -405,79 +468,11 @@ export default function TaskPage() {
     }
   };
 
-  const sendTeacher = async () => {
-    if (!teacherMsgs || teacherLoading) return;
-    const content = teacherInput.trim();
-    if (!content) return;
-
-    const msgs = [...teacherMsgs, { role: 'user', content } as ChatMessage];
-    setTeacherMsgs(msgs);
-    setTeacherInput('');
-    setTeacherLoading(true);
-
-    // плейсхолдер для накопления ответа учителя
-    setTeacherMsgs(prev => [...prev, { role: 'assistant', content: '' }]);
-
-    // используем наш «мерджер» из предыдущего шага (устойчив к накопит. чанкам)
-    const { createStreamMerger } = await import('@/lib/api/stream_delta');
-    const merge = createStreamMerger('');
-
-    try {
-      await streamText(
-        `/api/tasks/${taskId}/teacher/stream`,
-        { messages: msgs },
-        (rawChunk) => {
-          // проверяем, не пришёл ли мета-чанк
-          const idx = rawChunk.indexOf(META_MARK);
-          if (idx >= 0) {
-            // левая часть — продолжение текста
-            const left = rawChunk.slice(0, idx);
-            const fullLeft = merge.push(left);
-            setTeacherMsgs(prev => {
-              const copy = prev.slice();
-              const last = copy[copy.length - 1];
-              if (last?.role === 'assistant') last.content = fullLeft;
-              return copy;
-            });
-
-            // правая часть — JSON метаданных (может быть с \n в конце)
-            const metaRaw = rawChunk.slice(idx + META_MARK.length).trim();
-            try {
-              const meta = JSON.parse(metaRaw);
-              if (meta?.type === 'teacher_meta' && meta?.is_solved && meta?.coins_rewarded > 0) {
-                setCongrats({ coins: meta.coins_rewarded });
-              }
-            } catch {
-              // тихо игнорируем, если вдруг обрезался чанк — на практике придёт целиком
-            }
-            return; // мету в чат не рендерим
-          }
-
-          // обычный чанк текста
-          const full = merge.push(rawChunk);
-          setTeacherMsgs(prev => {
-            const copy = prev.slice();
-            const last = copy[copy.length - 1];
-            if (last?.role === 'assistant') last.content = full;
-            return copy;
-          });
-        },
-        {
-          onDone: () => setTeacherLoading(false),
-          onError: () => setTeacherLoading(false),
-        }
-      );
-    } catch {
-      // оставляем накопленный текст как есть
-    } finally {
-      setTeacherLoading(false);
-    }
-  };
-
   const resetTeacher = () => {
     if (teacherLoading) return;
-    setTeacherMsgs(null);
+    setTeacherMsgs([]);
     setTeacherInput('');
+    setTeacherStarted(false);
   };
 
   if (!task) return null;
@@ -603,6 +598,7 @@ export default function TaskPage() {
         >
           <TeacherBlock
             messages={teacherMsgs}
+            teacherStarted={teacherStarted}
             input={teacherInput}
             setInput={setTeacherInput}
             onSend={sendTeacher}
@@ -1002,9 +998,10 @@ function AssistantBlock({
 /* ---------- AI учитель ---------- */
 
 function TeacherBlock({
-  messages, input, setInput, onSend, onReset, onStart, loading,
+  messages, teacherStarted, input, setInput, onSend, onReset, onStart, loading,
 }: {
-  messages: ChatMessage[] | null;
+  messages: ChatMessage[];
+  teacherStarted: boolean;
   input: string;
   setInput: (s: string) => void;
   onSend: () => void;
@@ -1034,7 +1031,7 @@ function TeacherBlock({
       </div>
 
       <div className="flex-1 min-h-0 mt-3 bg-white rounded-xl2 border border-primary-200/60 overflow-hidden">
-        {messages === null ? (
+        {!teacherStarted ? (
           <div className="h-full flex flex-col items-center justify-center gap-3">
             <MascotEyes
               face={mascotFaceWithoutPupils}
@@ -1083,7 +1080,7 @@ function TeacherBlock({
         )}
       </div>
 
-      {messages && (
+      {teacherStarted && (
         <div className="mt-3 flex items-end gap-2">
           <textarea
             ref={taRef}
