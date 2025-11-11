@@ -1,6 +1,7 @@
 # api/teacher.py
 from typing import Optional
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -75,7 +76,8 @@ async def teacher_message_stream(
 
         # 2) закончили стрим текста → проверяем, решено ли, и обновляем статистику
         text = "".join(full_chunks)
-        is_solved_flag = 'задача решена' in text.lower()
+        normalized = re.sub(r'\s+', ' ', text.lower())
+        is_solved_flag = 'задача решена' in normalized
 
         stats_out = None
         coins_rewarded = 0
