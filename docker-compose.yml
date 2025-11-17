@@ -1,0 +1,76 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mathy-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      - DATABASE_URL=sqlite+aiosqlite:///var/app.db
+
+      # OpenRouter (установите ваш ключ!)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-sk-or-v1-your-key-here}
+      - OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+      - LLM_MODEL_CHECK=deepseek/deepseek-r1
+      - LLM_MODEL_ASSISTANT=deepseek/deepseek-r1
+      - LLM_MODEL_SOLVE=deepseek/deepseek-r1
+      - LLM_MODEL_VISION=google/gemini-2.5-pro
+      - STRICT_JSON=true
+
+      # Data/Storage
+      - DATA_PATH=data/tasks.csv
+      - THEORY_PATH=data/theory.csv
+      - STORAGE_DIR=var/storage
+      - TEACHER_MODE=true
+
+      # Auth
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      - JWT_ALG=HS256
+      - ACCESS_EXPIRES_MIN=120
+      - REFRESH_EXPIRES_DAYS=14
+    volumes:
+      - backend-data:/app/var
+      - backend-storage:/app/var/storage
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mathy-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    container_name: mathy-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mathy-network
+
+volumes:
+  backend-data:
+    driver: local
+  backend-storage:
+    driver: local
+
+networks:
+  mathy-network:
+    driver: bridge
