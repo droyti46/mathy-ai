@@ -3,10 +3,14 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173 },
+  server: {
+    host: '0.0.0.0',               // слушать на всех интерфейсах
+    port: 3000,                    // чтобы совпадало с nginx
+    allowedHosts: ['mathyai.ru', 'www.mathyai.ru'] // разрешаем домены
+  },
   resolve: {
     alias: {
-      '@': '/src' // alias под абсолютный импорт
+      '@': '/src'
     }
   }
 });
